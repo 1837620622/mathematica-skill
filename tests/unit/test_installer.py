@@ -151,3 +151,38 @@ def test_opencode_uses_local_type(fake_home: Path, tmp_path: Path) -> None:
     assert entry["type"] == "local"
     assert entry["enabled"] is True
     assert isinstance(entry["command"], list)
+
+
+def test_rollback_restores_only_its_own_target(fake_home: Path, tmp_path: Path) -> None:
+    """两个目标分别备份、分别回滚，不能互相串档。"""
+    first = tmp_path / "a"
+    second = tmp_path / "b"
+    install([first])
+    install([second])
+    (first / SKILL_NAME / "SKILL.md").write_text("A-modified", encoding="utf-8")
+    install([first])                    # 备份 A 的修改版
+    (first / SKILL_NAME / "SKILL.md").write_text("A-broken", encoding="utf-8")
+    (second / SKILL_NAME / "SKILL.md").write_text("B-untouched", encoding="utf-8")
+    rollback()
+    assert (first / SKILL_NAME / "SKILL.md").read_text(encoding="utf-8") == "A-modified"
+    assert (second / SKILL_NAME / "SKILL.md").read_text(encoding="utf-8") == "B-untouched"
+
+
+def test_update_without_force_keeps_foreign_directory(fake_home: Path, tmp_path: Path) -> None:
+    target = tmp_path / "skills"
+    install([target])
+    # 模拟目标被别的技能接管：去掉标记
+    (target / SKILL_NAME / ".mathematica-skill.json").unlink()
+    with pytest.raises(MskError):
+        update()
+    assert (target / SKILL_NAME).is_dir()
+
+
+def test_update_with_force_replaces_foreign_directory(fake_home: Path, tmp_path: Path) -> None:
+    target = tmp_path / "skills"
+    install([target])
+    (target / SKILL_NAME / ".mathematica-skill.json").unlink()
+    (target / SKILL_NAME / "SKILL.md").write_text("foreign", encoding="utf-8")
+    result = update(force=True)
+    assert result["ok"] is True
+    assert "mathematica-native" in (target / SKILL_NAME / "SKILL.md").read_text(encoding="utf-8")

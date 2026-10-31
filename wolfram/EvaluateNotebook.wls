@@ -71,7 +71,7 @@ frontendResult = Quiet[Check[
     ]
   ], maxSeconds + 120, $Aborted],
   $Failed
-], $Failed];
+]];
 
 If[frontendResult === $Failed && failureMessage === "",
   failureMessage = "UsingFrontEnd failed; Mathematica front end is unavailable in this session."

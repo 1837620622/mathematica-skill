@@ -152,6 +152,9 @@ def _tool_result(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 def _handle(request: dict[str, Any]) -> dict[str, Any] | None:
+    if not isinstance(request, dict):
+        return {"jsonrpc": "2.0", "id": None,
+                "error": {"code": -32600, "message": "Invalid Request: expected a JSON object"}}
     method = request.get("method")
     request_id = request.get("id")
     params = request.get("params") or {}
@@ -237,6 +240,10 @@ def serve() -> None:
         request = _read_message(input_stream)
         if request is None:
             break
+        if not isinstance(request, dict):
+            _write_message(output_stream, {"jsonrpc": "2.0", "id": None,
+                                           "error": {"code": -32600, "message": "Invalid Request"}})
+            continue
         if not request:
             _write_message(output_stream, {"jsonrpc": "2.0", "id": None,
                                            "error": {"code": -32700, "message": "Parse error"}})

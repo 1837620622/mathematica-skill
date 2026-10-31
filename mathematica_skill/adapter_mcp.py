@@ -67,30 +67,25 @@ class AgentToolsMCPClient:
         if self.process is None or self.process.stdin is None:
             raise MskError("MCP_ERROR", "MCP server is not running")
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.process.stdin.write(b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body)
+        # MCP stdio transport 是换行分隔 JSON，不是 LSP 的 Content-Length 头。
+        self.process.stdin.write(body + b"\n")
         self.process.stdin.flush()
 
     def _read(self) -> dict[str, Any]:
         if self.process is None or self.process.stdout is None:
             raise MskError("MCP_ERROR", "MCP server is not running")
-        headers: dict[str, str] = {}
         while True:
             line = self.process.stdout.readline()
             if not line:
                 raise MskError("MCP_ERROR", "MCP server closed the connection")
             stripped = line.strip()
             if not stripped:
-                break
-            key, _, value = stripped.decode("latin-1").partition(":")
-            headers[key.lower()] = value.strip()
-        length = int(headers.get("content-length", "0"))
-        if not length:
-            raise MskError("MCP_ERROR", "MCP server returned no Content-Length")
-        body = self.process.stdout.read(length)
-        try:
-            return json.loads(body.decode("utf-8"))
-        except json.JSONDecodeError as exc:
-            raise MskError("MCP_ERROR", "MCP server returned invalid JSON") from exc
+                continue
+            if stripped.startswith(b"{"):
+                try:
+                    return json.loads(stripped.decode("utf-8"))
+                except json.JSONDecodeError as exc:
+                    raise MskError("MCP_ERROR", "MCP server returned invalid JSON") from exc
 
     def _request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         request_id = self.next_id

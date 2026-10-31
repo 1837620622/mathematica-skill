@@ -89,11 +89,18 @@ msFail[code_String, message_String, details_: <||>] := Module[{payload},
   Exit[1]
 ];
 
+(* Import[..., "JSON"] 把对象读成规则列表，不是 Association；这里递归转一次，
+   否则 Lookup / assoc["key"] 全部失效。空列表保持为 {}。 *)
+msToAssoc[x_Association] := AssociationMap[msToAssoc, x];
+msToAssoc[r : {__Rule}] := Association @@ Map[Rule[#[[1]], msToAssoc[#[[2]]]] &, r];
+msToAssoc[l_List] := msToAssoc /@ l;
+msToAssoc[x_] := x;
+
 msReadJSON[path_String] := Module[{data},
   If[! FileExistsQ[path], msFail["INVALID_TASK", "JSON file not found: " <> path]];
   data = Quiet[Check[Import[path, "JSON"], $Failed]];
   If[data === $Failed, msFail["INVALID_TASK", "Cannot parse JSON: " <> path]];
-  data
+  msToAssoc[data]
 ];
 
 msMessageText[list_List] := ToString /@ DeleteDuplicates[list];

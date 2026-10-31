@@ -55,7 +55,7 @@ class CheckSpec:
         if not isinstance(data, dict):
             errors.append(f"tasks[{task_id}].checks[{index}] must be an object")
             return cls(id=f"{task_id}.check{index + 1}", kind="boolean", expression="False")
-        check_id = data.get("id") or f"{task_id}.check{index + 1}"
+        check_id = data.get("id") or f"{task_id}-check{index + 1}"
         _require(isinstance(check_id, str) and bool(ID_PATTERN.match(check_id)),
                  f"invalid check id: {check_id!r}", errors)
         kind = data.get("kind", "numeric")

@@ -27,7 +27,8 @@ assumptions = Lookup[task, "assumptions", {}];
 problemHeading = If[language === "zh", "题目", "Problem"];
 assumptionHeading = If[language === "zh", "假设", "Assumptions"];
 
-textCell[text_String] := Cell[TextData[{text}], "Text"];
+(* 直接把字符串当 Text 单元内容：Mathematica 会按文本排版，保留换行与转义。 *)
+textCell[text_String] := Cell[text, "Text"];
 sectionCell[text_String] := Cell[text, "Section"];
 subsectionCell[text_String] := Cell[text, "Subsection"];
 titleCell[text_String] := Cell[text, "Title"];

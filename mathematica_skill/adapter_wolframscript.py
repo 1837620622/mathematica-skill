@@ -40,11 +40,17 @@ class WolframscriptAdapter:
     def _is_wolframscript(self) -> bool:
         return Path(self.executable).name.lower().startswith("wolframscript")
 
-    def command_for(self, script: str, args: list[str | Path], *, timeout: float) -> list[str]:
-        """构造命令行；单独抽出来是为了能对三平台的路径做单元测试。"""
+    def command_for(self, script: str, args: list[str | Path], *, timeout: float,
+                    launcher_timeout: float | None = None) -> list[str]:
+        """构造命令行；单独抽出来是为了能对三平台的路径做单元测试。
+
+        `-timeout` 是 wolframscript 的外层预算，必须比脚本内部 `TimeConstrained`
+        更宽松，否则脚本还没机会写结果文件就被外层掐掉。
+        """
         script_path = self._script(script)
+        budget = max(1, int(launcher_timeout if launcher_timeout is not None else timeout))
         if self._is_wolframscript():
-            command = [self.executable, "-charset", "UTF8", "-timeout", str(max(1, int(timeout)))]
+            command = [self.executable, "-charset", "UTF8", "-timeout", str(budget)]
             if self.kernel_path and Path(self.kernel_path).is_file():
                 command += ["-local", self.kernel_path]
             command += ["-file", str(script_path)]
@@ -55,12 +61,14 @@ class WolframscriptAdapter:
         return [self.executable, "-noprompt", "-run", f'Get["{escaped}"]']
 
     def _run(self, script: str, args: list[str | Path], *, timeout: float | None = None,
-             cwd: Path | None = None, result_path: Path | None = None) -> NativeRun:
+             cwd: Path | None = None, result_path: Path | None = None,
+             launcher_timeout: float | None = None) -> NativeRun:
         effective = float(timeout or self.default_timeout)
-        command = self.command_for(script, args, timeout=effective)
+        budget = float(launcher_timeout if launcher_timeout is not None else effective)
+        command = self.command_for(script, args, timeout=effective, launcher_timeout=budget)
         if result_path is not None:
             Path(result_path).unlink(missing_ok=True)
-        result = run_process(command, cwd=cwd, timeout=effective,
+        result = run_process(command, cwd=cwd, timeout=budget + 30,
                              env={"MSK_SCRIPT_ARGS": "\n".join(str(arg) for arg in args)})
         payload = None
         # 结果文件比 stdout 更可靠：用户代码里的 Print 不会污染 JSON。
@@ -88,6 +96,8 @@ class WolframscriptAdapter:
             result.status = "failed"
             result.error_code = "EVALUATION_FAILED"
             result.message = "the Wolfram script did not return JSON"
+        if result.status == "timeout":
+            result.error_code = "TIMEOUT"
         return result
 
     def build_notebook(self, task_json: Path, notebook: Path, code_wl: Path, result_json: Path,
@@ -99,7 +109,9 @@ class WolframscriptAdapter:
                           timeout: float | None = None) -> NativeRun:
         effective = float(timeout or self.default_timeout)
         args: list[str | Path] = [notebook, result_json, mode, str(int(effective))]
-        return self._run("EvaluateNotebook.wls", args, timeout=effective, result_path=result_json)
+        # 脚本内部允许 maxSeconds + 120；外层再多给 30 秒，超时才真的报 TIMEOUT。
+        return self._run("EvaluateNotebook.wls", args, timeout=effective, result_path=result_json,
+                         launcher_timeout=effective + 150)
 
     def inspect_notebook(self, notebook: Path, result_json: Path, *, timeout: float | None = None) -> NativeRun:
         return self.evaluate_notebook(notebook, result_json, mode="reopen", timeout=timeout)

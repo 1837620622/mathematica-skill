@@ -145,3 +145,15 @@ def test_evaluate_notebook_passes_timeout(tmp_path: Path) -> None:
     command = adapter.command_for("EvaluateNotebook.wls", ["nb", "r.json", "evaluate", "240"], timeout=240)
     assert "-timeout" in command
     assert command[command.index("-timeout") + 1] == "240"
+
+
+def test_launcher_timeout_is_more_generous_than_kernel_budget(tmp_path: Path) -> None:
+    """脚本内部 TimeConstrained 是 N，外层 wolframscript -timeout 必须更大。"""
+    fake = tmp_path / "wolframscript"
+    fake.write_text("#!/bin/sh\nexit 0\n")
+    fake.chmod(0o755)
+    adapter = WolframscriptAdapter(fake, default_timeout=30)
+    command = adapter.command_for("EvaluateNotebook.wls", ["nb", "r", "evaluate", "240"],
+                                  timeout=240, launcher_timeout=390)
+    assert command[command.index("-timeout") + 1] == "390"
+    assert "240" in command

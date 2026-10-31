@@ -41,12 +41,26 @@ msListEqual[a_, b_, _, _] := TrueQ[Quiet[Simplify[a == b]]];
 msRange[a_, range_List] := NumberQ[a] && Length[range] === 2 &&
   TrueQ[range[[1]] <= a <= range[[2]]];
 
+(* 上一轮把 Rational / Complex / 大表达式序列化成 InputForm 字符串，
+   比较前先还原，否则精确数学的结果永远「不可复现」。 *)
+msRehydrate[x_String] := Module[{parsed},
+  parsed = Quiet[Check[ToExpression[x, InputForm], $Failed]];
+  If[parsed === $Failed, x, parsed]
+];
+msRehydrate[x_List] := msRehydrate /@ x;
+msRehydrate[x_] := x;
+
+msSameExpression[a_, b_] := Module[{left = msRehydrate[a], right = msRehydrate[b]},
+  TrueQ[Quiet[Simplify[left == right]]] ||
+    StringTrim[ToString[left, InputForm]] === StringTrim[ToString[right, InputForm]]
+];
+
 msReproduced[a_, b_, kind_, absTol_, relTol_] := Which[
-  kind === "numeric", msNumericEqual[a, b, absTol, relTol],
-  kind === "matrix" || kind === "list", msListEqual[a, b, absTol, relTol],
-  kind === "range", msNumericEqual[First[a], First[b], absTol, relTol] &&
-    msNumericEqual[Last[a], Last[b], absTol, relTol],
+  kind === "numeric", msNumericEqual[msRehydrate[a], msRehydrate[b], absTol, relTol],
+  kind === "matrix" || kind === "list", msListEqual[msRehydrate[a], msRehydrate[b], absTol, relTol],
+  kind === "range", msNumericEqual[msRehydrate[a], msRehydrate[b], absTol, relTol],
   MemberQ[{"boolean"}, kind], TrueQ[a] === TrueQ[b],
+  MemberQ[{"symbolic", "exact", "expression"}, kind], msSameExpression[a, b],
   True, StringTrim[ToString[a]] === StringTrim[ToString[b]]
 ];
 

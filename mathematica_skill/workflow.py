@@ -111,13 +111,19 @@ def plan_task(task_path: str | Path, options: RunOptions | None = None) -> dict[
     }
 
 
+def _code_units(document: TaskDocument) -> list[tuple[str, str]]:
+    """所有会被真正求值的代码：任务代码 + 每个输出表达式。"""
+    units = [(task.id, task.code) for task in document.tasks]
+    units += [(f"output:{output.id}", output.expression) for output in document.outputs]
+    return units
+
+
 def _policy_findings(document: TaskDocument, *, allow_external: bool) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
-    for task in document.tasks:
-        code = task.code
+    for unit_id, code in _code_units(document):
         for label, pattern in POLICY_PATTERNS.items():
             for match in re.finditer(pattern, code):
-                findings.append({"task": task.id, "kind": label, "match": match.group(0)[:120]})
+                findings.append({"task": unit_id, "kind": label, "match": match.group(0)[:120]})
     if not allow_external:
         for source in document.sources:
             if source.startswith(("http://", "https://", "ftp://")):
@@ -127,12 +133,12 @@ def _policy_findings(document: TaskDocument, *, allow_external: bool) -> list[di
 
 def _lint(document: TaskDocument, *, allow_external: bool, report: ValidationReport) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    for task in document.tasks:
-        syntax = check_syntax(task.code)
-        item = {"task": task.id, **syntax.to_dict()}
+    for unit_id, code in _code_units(document):
+        syntax = check_syntax(code)
+        item = {"task": unit_id, **syntax.to_dict()}
         results.append(item)
         for message in syntax.errors:
-            report.add("error", "WL_SYNTAX", f"{task.id}: {message}", task.id)
+            report.add("error", "WL_SYNTAX", f"{unit_id}: {message}", unit_id)
     # 危险调用默认阻断；操作员明确 --allow-external 时降级为 warning，
     # 但永远记录在报告里，不会静默放行。
     policy = _policy_findings(document, allow_external=allow_external)
@@ -294,7 +300,9 @@ def run_task(task_path: str | Path, options: RunOptions | None = None) -> dict[s
         adapter = WolframscriptAdapter(doctor.wolframscript or doctor.kernel_path,
                                        default_timeout=options.timeout,
                                        kernel_path=doctor.kernel_path)
-        task_json = run_dir / "task.json"
+        # 与 sources 放在同一目录：WL 脚本会用 task.json 的目录做 cwd，
+        # 用户写 Import["data.csv"] 才能找到同目录下的数据文件。
+        task_json = run_dir / "input" / "task.json"
         document.save(task_json)
         code_wl = run_dir / "computation.wl"
         code_wl.write_text(build_code_script(document), encoding="utf-8")
@@ -417,7 +425,7 @@ def run_task(task_path: str | Path, options: RunOptions | None = None) -> dict[s
         # 最终审查：Notebook 结构、原生输出、PNG 尺寸与内容、数值检查、复算结果
         validate_artifacts(artifacts_dir, [item.to_dict() for item in document.selected_outputs()], report=report)
         validate_notebook(notebook, native_result=reopen_result, report=report, require_frontend=True)
-        validate_checks(first.payload, report=report)
+        validate_checks(first.payload, report=report, expected_total=len(list(document.all_checks())))
         validate_reproduction(comparison, report=report)
         _resolve_notebook_paths(document, notebook, report=report)
         validation = report.to_dict()

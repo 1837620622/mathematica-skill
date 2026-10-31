@@ -48,10 +48,21 @@ def _run(command: list[str], *, timeout: float = 25.0) -> tuple[int, str, str]:
         return 126, "", str(exc)
 
 
+_VERSION_SEGMENT = re.compile(r"(?<!\d)(\d{1,2})\.(\d{1,2})(?!\d)")
+
+
 def _version_key(path: Path) -> tuple[int, ...]:
-    """按路径里的数字排序，取最新版本（14.0 > 13.3 > 13.2）。"""
-    numbers = [int(item) for item in re.findall(r"\d+", str(path))]
-    return tuple(numbers[-6:])
+    """只取路径里形如 14.0 / 13.3 的版本段，取最新。
+
+    不能把路径里所有数字都算进来：Windows 的 Program Files (x86) 里那个 86
+    会被误当成版本号，结果反而选中旧版。
+    会把 (x86) 的 86 当成版本号，反而选中旧版。
+    """
+    matches = _VERSION_SEGMENT.findall(str(path))
+    if not matches:
+        return (0, 0)
+    major, minor = matches[-1]
+    return (int(major), int(minor))
 
 
 def wolframscript_config_paths() -> list[Path]:
@@ -183,7 +194,8 @@ def _candidate_scripts() -> list[Path]:
                     candidates.append(base / "Executables/wolframscript")
         candidates += [Path("/usr/local/bin/wolframscript"), Path("/usr/bin/wolframscript"),
                        Path("/opt/homebrew/bin/wolframscript")]
-    return [path for name in names for path in candidates if path.name == name or path.is_file()]
+    wanted = set(names)
+    return [path for path in candidates if path.is_file() and path.name in wanted]
 
 
 def find_wolframscript() -> Path | None:

@@ -75,6 +75,15 @@ Do[
       AppendTo[errors, <|"output" -> id, "message" -> "expression did not evaluate: " <> expression|>];
       Continue[]
     ];
+    (* 表达式自己 Export 过时返回值是文件名；这时绝不能拿路径当图去 Rasterize。 *)
+    If[StringQ[value],
+      If[FileExistsQ[value],
+        value = Quiet[Check[Import[value, "Image"], $Failed]],
+        AppendTo[errors, <|"output" -> id,
+          "message" -> "expression returned a string, not graphics: " <> expression|>];
+        Continue[]
+      ]
+    ];
     exported = $Failed;
     dimensions = Missing["NotApplicable"];
     Which[

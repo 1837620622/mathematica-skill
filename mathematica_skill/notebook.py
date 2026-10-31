@@ -51,7 +51,8 @@ def wl_string(value: str) -> str:
         elif char == "\t":
             out.append("\\t")
         elif ord(char) < 32:
-            out.append(f"\\[{ord(char):03d}]")
+            # Wolfram Language 的 \[011] 是「名称」形式，控制字符要用 \.xx
+            out.append(f"\\.{ord(char):02x}")
         else:
             out.append(char)
     out.append('"')
@@ -88,6 +89,22 @@ def _unescape_wl(token: str) -> str:
         if nxt in mapping:
             out.append(mapping[nxt])
             index += 2
+        elif nxt == ".":
+            # \.xx —— 两位十六进制（控制字符用这个形式）
+            code = body[index + 2:index + 4]
+            try:
+                out.append(chr(int(code, 16)))
+            except ValueError:
+                out.append("\\." + code)
+            index += 4
+        elif nxt == ":":
+            # \:xxxx —— 四位十六进制 Unicode
+            code = body[index + 2:index + 6]
+            try:
+                out.append(chr(int(code, 16)))
+            except ValueError:
+                out.append("\\:" + code)
+            index += 6
         elif nxt == "[":
             end = body.find("]", index)
             code = body[index + 2:end] if end > 0 else ""
@@ -251,19 +268,37 @@ def forbidden_markers(text: str) -> list[str]:
     return [marker for marker in FORBIDDEN_MARKERS if marker in haystack]
 
 
+CELL_STYLES = ("Title", "Subtitle", "Section", "Subsection", "Subsubsection",
+               "Text", "Input", "Output", "Code", "Program")
+
+
+def count_cell_styles(text: str) -> dict[str, int]:
+    """统计单元样式。
+
+    样式名不一定是 Cell 的最后一个参数（真实保存的 .nb 常带 CellChangeTimes、
+    CellTags 等尾随选项），所以只要求「逗号 + 带引号的样式名」出现。
+    """
+    counts = {style: 0 for style in CELL_STYLES}
+    pattern = re.compile(r'Cell\[[^\x00]*?,\s*"(' + "|".join(CELL_STYLES) + r')"')
+    for match in pattern.finditer(text):
+        counts[match.group(1)] += 1
+    return counts
+
+
 def inspect_notebook(path: Path) -> dict[str, object]:
     text = path.read_text(encoding="utf-8")
-    styles = re.findall(r"Cell\[.*?,\s*\"([A-Za-z]+)\"\s*\]", text, flags=re.S)
+    styles = count_cell_styles(text)
     return {
         "path": path.name,
         "bytes": path.stat().st_size,
         "cells": notebook_cell_count(text),
-        "input_cells": styles.count("Input"),
-        "output_cells": styles.count("Output"),
-        "text_cells": styles.count("Text"),
-        "title_cells": styles.count("Title"),
-        "section_cells": styles.count("Section"),
-        "subsection_cells": styles.count("Subsection"),
+        "style_counts": styles,
+        "input_cells": styles["Input"],
+        "output_cells": styles["Output"],
+        "text_cells": styles["Text"],
+        "title_cells": styles["Title"],
+        "section_cells": styles["Section"],
+        "subsection_cells": styles["Subsection"],
         "auto_execution": has_auto_execution(text),
         "absolute_paths": absolute_paths_in(text),
         "forbidden_markers": forbidden_markers(text),

@@ -173,7 +173,8 @@ def validate_notebook(notebook: Path, *, native_result: dict[str, Any] | None, r
                        f"notebook evaluation produced messages: {messages[:5]}", notebook.name)
 
 
-def validate_checks(checks: dict[str, Any] | None, *, report: ValidationReport) -> None:
+def validate_checks(checks: dict[str, Any] | None, *, report: ValidationReport,
+                    expected_total: int | None = None) -> None:
     if not checks:
         report.add("warning", "CHECKS_NOT_RUN", "no native verification record was produced")
         return
@@ -184,7 +185,13 @@ def validate_checks(checks: dict[str, Any] | None, *, report: ValidationReport) 
     total = int(checks.get("total", 0) or 0)
     if total == 0:
         report.add("warning", "CHECKS_EMPTY", "the task defines no numeric or symbolic checks")
-    for item in checks.get("checks", []):
+    if expected_total is not None and total != expected_total:
+        report.add("error", "CHECKS_INCOMPLETE",
+                   f"declared {expected_total} checks but only {total} were evaluated")
+    for item in checks.get("checks") or []:
+        if not isinstance(item, dict):
+            report.add("error", "CHECK_MALFORMED", f"check record is not an object: {str(item)[:120]!r}")
+            continue
         if not item.get("passed", False):
             report.add("error", "CHECK_FAILED",
                        f"{item.get('id')}: expected {item.get('expected')!r}, got {str(item.get('actual'))[:200]!r}")

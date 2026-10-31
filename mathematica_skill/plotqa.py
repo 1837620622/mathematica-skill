@@ -93,7 +93,9 @@ def read_png(path: Path) -> dict[str, object]:
         result["valid"] = False
         result["error"] = f"corrupt PNG data: {exc}"
         return result
-    pixels = _unfilter(raw, width, height, channels)
+    # 16 位图每通道 2 bytes，行跨度必须按字节算，否则第二行起全部错位。
+    bytes_per_pixel = channels * (2 if depth == 16 else 1)
+    pixels = _unfilter(raw, width, height, bytes_per_pixel)
     step = 2 if depth == 16 else 1
     if color_type == 3:
         palette = next((body for kind, body in chunks if kind == b"PLTE"), b"")
@@ -113,15 +115,19 @@ def read_png(path: Path) -> dict[str, object]:
                 for i in range(3)
             )
         return result
-    pixels_per_row = width * channels
+    pixels_per_row = width * bytes_per_pixel
     sampled: Counter[tuple[int, ...]] = Counter()
     dark = 0
     total = 0
     for row in range(0, height, max(1, height // 400)):
         start = row * pixels_per_row
         line = pixels[start:start + pixels_per_row]
-        for index in range(0, len(line) - channels + 1, channels * max(1, width // 300)):
-            pixel = tuple(line[index:index + channels])
+        step_x = bytes_per_pixel * max(1, width // 300)
+        for index in range(0, len(line) - bytes_per_pixel + 1, step_x):
+            if depth == 16:
+                pixel = tuple(line[index:index + channels * 2:2])  # 每个通道取高字节
+            else:
+                pixel = tuple(line[index:index + channels])
             sampled[pixel] += 1
             total += 1
             if color_type in (0, 4):

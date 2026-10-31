@@ -219,7 +219,11 @@ def write_svg(size: int = 1024, *, spike: float = 1.85, tilt_deg: float = 0.0) -
         for _d, coords, color in sorted(faces)
     )
     radius = size * 0.225
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" width="{size}" height="{size}" role="img" aria-label="mathematica-skill">
+    header = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
+        f'width="{size}" height="{size}" role="img" aria-label="mathematica-skill">'
+    )
+    svg = f'''{header}
   <defs>
     <radialGradient id="bg" cx="44%" cy="30%" r="82%">
       <stop offset="0%" stop-color="#5c1721"/>

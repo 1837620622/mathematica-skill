@@ -28,6 +28,26 @@ def tail(text: str, limit: int = 8000) -> str:
     return text[-limit:] if len(text) > limit else text
 
 
+def _terminate(process: subprocess.Popen) -> None:
+    """整棵进程树终止；Windows 用 taskkill /T，POSIX 用 killpg。"""
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                           capture_output=True, timeout=30, check=False)
+            return
+        except (OSError, subprocess.SubprocessError):
+            pass
+        process.kill()
+        return
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except OSError:
+        try:
+            process.kill()
+        except OSError:
+            pass
+
+
 def run_process(
     command: list[str],
     *,
@@ -39,17 +59,23 @@ def run_process(
     merged_env = os.environ.copy()
     if env:
         merged_env.update(env)
+    creationflags = 0
+    if os.name == "nt":
+        # wolframscript.exe 会再拉一个 WolframKernel 子进程，单独成组才好整棵树杀。
+        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     try:
         process = subprocess.Popen(
             command,
             cwd=str(cwd) if cwd else None,
             env=merged_env,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace",
             start_new_session=(os.name != "nt"),
+            creationflags=creationflags,
         )
     except FileNotFoundError:
         return NativeRun(ok=False, status="failed", error_code="ENGINE_NOT_FOUND",
@@ -59,14 +85,11 @@ def run_process(
     try:
         stdout, stderr = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        if os.name != "nt" and process.pid:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except OSError:
-                process.kill()
-        else:
-            process.kill()
-        stdout, stderr = process.communicate()
+        _terminate(process)
+        try:
+            stdout, stderr = process.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", ""
         return NativeRun(ok=False, status="timeout", error_code="TIMEOUT",
                          message=f"native run exceeded {timeout:.0f}s",
                          stdout=tail(stdout or ""), stderr=tail(stderr or ""),

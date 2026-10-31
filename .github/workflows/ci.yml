@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  static:
+    name: static + unit (${{ matrix.os }}, ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install
+        run: python -m pip install --upgrade pip && python -m pip install -e . pytest
+
+      - name: Compile
+        run: python -m compileall -q mathematica_skill
+
+      - name: Unit tests
+        run: python -m pytest -q -m "not native"
+
+      - name: CLi smoke
+        run: |
+          python -m mathematica_skill.cli --version
+          python -m mathematica_skill.cli example --write task.json
+          python -m mathematica_skill.cli plan task.json
+          python -m mathematica_skill.cli lint task.json
+
+      - name: Doctor (no engine expected on CI)
+        continue-on-error: true
+        run: python -m mathematica_skill.cli doctor
+
+  wolfram:
+    name: wolfram scripts are balanced
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e .
+      - name: Check WL brackets and project lint
+        run: python scripts/check.py
+
+  native-note:
+    name: native tests need a licensed kernel
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Native (tests/native, -m native) tests require Mathematica/Wolfram Engine"
+          echo "and a notebook front end. They are intentionally skipped on public runners;"
+          echo "see docs/VALIDATION.md for how to run and record them on your own machine."
