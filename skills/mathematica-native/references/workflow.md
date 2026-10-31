@@ -33,7 +33,7 @@ work/<run-id>/
 | 阶段 | 输入 | 输出 | 失败后果 |
 | --- | --- | --- | --- |
 | intake | 原始任务 JSON | 源文件哈希、字节数 | 直接失败 |
-| inspect | 隔离副本 | sources 清单、checks 数量 | 缺 source 阻断 |
+| inspect | 隔离副本 | sources 清单、checks 数量 | 缺 source 或没有任何 check 阻断（`CHECKS_EMPTY`） |
 | plan | tasks/outputs | 结构化计划 | 重名、未知 output 阻断 |
 | lint | WL 代码 | 词法/括号/政策检查 | 有 error 阻断 |
 | preflight | 环境 | doctor 结果 | 无内核只能 draft；前端不可用不能 verified |

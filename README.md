@@ -182,7 +182,7 @@ mathematica-skill build task.json --draft --out build/
 规则：
 
 - `code` 必须是能跑的 Wolfram Language，不写伪代码。
-- `checks` 必须给可比较的 `expected` 和容差；没检查就等于没验证。
+- `checks` 必须给可比较的 `expected` 和容差；没检查就等于没验证。至少要有一条，否则 `run` 在进入内核之前以 `CHECKS_EMPTY` 拦下。
 - `outputs[].expression` 必须在前面的代码里算过。
 - `sources` 只能是相对路径，运行时会复制进隔离目录。
 - `delivery.include` 决定哪些 output 进客户目录。

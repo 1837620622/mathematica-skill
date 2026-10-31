@@ -100,6 +100,19 @@ def test_notebook_serious_messages_block(tmp_path: Path) -> None:
     assert any(finding.code == "NOTEBOOK_MESSAGES" for finding in report.errors())
 
 
+def test_zero_checks_cannot_pass_as_verified() -> None:
+    """没有任何检查被执行时，「通过」没有依据，必须拦住（这是放宽前的回归保护）。"""
+    report = ValidationReport()
+    validate_checks({"ok": True, "total": 0, "passed": 0, "checks": []}, report=report, expected_total=0)
+    assert any(finding.code == "CHECKS_EMPTY" for finding in report.errors())
+
+
+def test_missing_check_record_blocks() -> None:
+    report = ValidationReport()
+    validate_checks(None, report=report)
+    assert any(finding.code == "CHECKS_NOT_RUN" for finding in report.errors())
+
+
 def test_failed_check_blocks() -> None:
     report = ValidationReport()
     validate_checks({"ok": True, "total": 1, "passed": 0,

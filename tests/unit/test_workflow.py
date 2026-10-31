@@ -109,6 +109,22 @@ def test_open_engine_with_stub_frontend_still_blocks(monkeypatch: pytest.MonkeyP
     assert not any((tmp_path / "work").rglob("deliver"))
 
 
+def test_run_without_checks_is_blocked_before_native_work(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+                                                         task_payload: dict) -> None:
+    """没有 checks 的任务不能进入 verified；门禁要在原生阶段之前拦下，并留下验收报告。"""
+    task_payload["tasks"][0]["checks"] = []
+    path = tmp_path / "nochecks.json"
+    path.write_text(json.dumps(task_payload), encoding="utf-8")
+    monkeypatch.setattr(workflow, "detect", _no_engine)
+    state = run_task(path, RunOptions(work_root=tmp_path / "work"))
+    assert state["status"] == "blocked"
+    assert state["verified"] is False
+    assert [item["code"] for item in state["errors"]] == ["CHECKS_EMPTY"]
+    assert "native_build" not in [stage["stage"] for stage in state["stages"]]
+    report = json.loads((Path(state["run_dir"]) / "_validation" / "validation.json").read_text(encoding="utf-8"))
+    assert report["ok"] is False
+
+
 def test_policy_block_short_circuits(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
                                      task_payload: dict) -> None:
     task_payload["tasks"][0]["code"] = 'RunProcess[{"rm", "-rf", "/"}];'

@@ -10,6 +10,7 @@
 | 构造 | 每个 `task.code` 被 Mathematica 解析器接受 | `EVALUATION_FAILED` |
 | 前端 | `.nb` 被真实前端打开、执行、保存、关闭、再打开 | `FRONTEND_UNAVAILABLE` / `NOTEBOOK_OPEN_FAILED` |
 | 输出 | Input 单元执行后产生 Output 单元 | `NOTEBOOK_NO_OUTPUT` |
+| 检查 | 至少一条 check 被执行，全部通过，且检查记录存在（没有检查不能说通过） | `CHECKS_EMPTY` / `CHECKS_NOT_RUN` / `CHECKS_FAILED` |
 | 复算 | 新进程重新执行，逐项 checks 一致 | `NUMERIC_MISMATCH` |
 | 图 | PNG 尺寸等于声明值，非空白，非单色，文件完整 | `PNG_INVALID` / `PNG_DIMENSIONS` |
 | 数据 | PDF 有 `%PDF` 头，SVG 有根节点，CSV/XLSX 非空 | `PDF_INVALID` / `SVG_INVALID` |

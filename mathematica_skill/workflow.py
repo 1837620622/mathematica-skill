@@ -174,7 +174,10 @@ def _inventory(document: TaskDocument, run_dir: Path, *, report: ValidationRepor
             report.add("error", "SOURCE_MISSING", f"declared source is missing: {relative}", relative)
     inventory["checks"] = sum(len(task.checks) for task in document.tasks)
     if inventory["checks"] == 0:
-        report.add("warning", "CHECKS_EMPTY", "no checks are declared; results cannot be compared numerically")
+        # 没有 checks 就没有可比较的结果，任何「通过」都只是程序自己跟自己对；
+        # 记为 error 后，预检之后的流程直接停止，不会进入内核。
+        report.add("error", "CHECKS_EMPTY",
+                   "a verified run needs at least one check; add checks, or use `build` for an unverified notebook")
     return inventory
 
 
@@ -265,6 +268,8 @@ def run_task(task_path: str | Path, options: RunOptions | None = None) -> dict[s
             _record(state, "preflight", "failed", detail={"errors": [item.to_dict() for item in report.errors()]})
             state["status"] = "blocked"
             state["errors"] = [item.to_dict() for item in report.errors()]
+            # 被拦下的运行也要留下验收报告，审查者靠 validation.json 知道卡在哪一道门。
+            write_reports(run_dir, state, report.to_dict(), doctor.to_dict())
             _save(state)
             return state
         _record(state, "preflight", "completed" if doctor.engine_usable else "failed",

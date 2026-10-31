@@ -175,8 +175,9 @@ def validate_notebook(notebook: Path, *, native_result: dict[str, Any] | None, r
 
 def validate_checks(checks: dict[str, Any] | None, *, report: ValidationReport,
                     expected_total: int | None = None) -> None:
+    # 没有检查记录或检查数为 0 时，「通过」没有任何依据，必须是 error，不能只是提醒。
     if not checks:
-        report.add("warning", "CHECKS_NOT_RUN", "no native verification record was produced")
+        report.add("error", "CHECKS_NOT_RUN", "no native verification record was produced")
         return
     report.checks = {key: checks.get(key) for key in
                      ("ok", "total", "passed", "reproduced", "all_reproduced", "error_code", "message")}
@@ -184,7 +185,7 @@ def validate_checks(checks: dict[str, Any] | None, *, report: ValidationReport,
         report.add("error", "CHECKS_FAILED", str(checks.get("message") or "native checks failed"))
     total = int(checks.get("total", 0) or 0)
     if total == 0:
-        report.add("warning", "CHECKS_EMPTY", "the task defines no numeric or symbolic checks")
+        report.add("error", "CHECKS_EMPTY", "verified output needs at least one evaluated check")
     if expected_total is not None and total != expected_total:
         report.add("error", "CHECKS_INCOMPLETE",
                    f"declared {expected_total} checks but only {total} were evaluated")

@@ -176,7 +176,7 @@ mathematica-skill build task.json --draft --out build/
 Rules:
 
 - `code` must be runnable Wolfram Language, never pseudocode.
-- `checks` must carry a comparable `expected` and a tolerance; no checks means nothing is verified.
+- `checks` must carry a comparable `expected` and a tolerance; no checks means nothing is verified. At least one check is required; without one, `run` stops before the kernel with `CHECKS_EMPTY`.
 - `outputs[].expression` must have been computed by the code above.
 - `sources` are relative paths, copied into an isolated run directory.
 - `delivery.include` selects which outputs reach the client folder.
