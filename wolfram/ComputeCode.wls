@@ -6,6 +6,16 @@
 $scriptDir = If[$InputFileName === "", Directory[], DirectoryName[ExpandFileName[$InputFileName]]];
 Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}], CharacterEncoding -> "UTF-8"];
 
+(* 建模常用的方法库随 compute 预加载；某个库加载失败只影响它自己，并在结果的 libraries 里报告。 *)
+libraryStatus = <||>;
+Do[
+  libraryStatus[lib] = Quiet[Check[
+    Get[FileNameJoin[{$scriptDir, lib <> ".wl"}], CharacterEncoding -> "UTF-8"]; True,
+    False
+  ]],
+  {lib, {"DomainMethods", "PlotTheme"}}
+];
+
 args = msArgs[];
 If[Length[args] < 4,
   msFail["INVALID_TASK", "usage: ComputeCode.wls <code.wl> <result.json> <figure.png> <workdir> [maxSeconds]"]
@@ -72,6 +82,7 @@ msWriteResult[resultPath, <|
   "result_head" -> resultHead,
   "result_tex" -> resultTeX,
   "truncated" -> truncated,
+  "libraries" -> libraryStatus,
   "figure_written" -> figureWritten,
   "messages" -> messages,
   "message_count" -> Length[messages],
