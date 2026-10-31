@@ -92,7 +92,8 @@ macOS Apple Silicon 是主要验收平台；Windows / Linux 的路径、进程�
 | 报告 | `validation.json` + `VALIDATION.md`，含「验证边界」声明 |
 | 交付 | 白名单目录 + SHA-256 manifest，可核对 |
 | 安装 | npx / npm / pip 三种入口，装完即用；`install / update / rollback / uninstall` 只动自己创建的文件 |
-| MCP | 9 个 `mathematica_*` 工具，stdio 传输，单行 JSON 帧 |
+| 快速计算 | `compute`：执行一段 Wolfram 代码，返回结果、消息和可选 PNG；不进入交付流程，永远 `verified=false` |
+| MCP | 11 个 `mathematica_*` 工具，stdio 传输，单行 JSON 帧 |
 | Skill | 符合 Agent Skills frontmatter，可装到 Claude / Codex / Cursor / OpenCode 等 |
 
 ## 4. 安装（三种入口，装完即用）
@@ -199,6 +200,7 @@ mathematica-skill build task.json --draft --out build/
 | `run` | 完整流水线，产出 verified 交付或明确的失败状态 |
 | `build` | 只生成 `.nb` + `.wl`（`--draft` 无需 Mathematica） |
 | `evaluate` | 用前端执行一个已有 `.nb` |
+| `compute` | 快速执行一段 Wolfram 代码，返回结果与消息；不做交付，永远 `verified=false` |
 | `export` | 从真实表达式导出 PNG/PDF/CSV/XLSX |
 | `verify` | 干净内核执行 checks，可与上一轮比较 |
 | `install` / `update` / `uninstall` / `rollback` | Skill 安装与 MCP 配置，支持 `--dry-run` |
@@ -210,10 +212,12 @@ mathematica-skill build task.json --draft --out build/
 
 ```
 mathematica_doctor            mathematica_plan             mathematica_lint
-mathematica_build             mathematica_run              mathematica_evaluate_notebook
-mathematica_export            mathematica_verify           mathematica_example
-mathematica_edit_notebook
+mathematica_build             mathematica_run              mathematica_compute
+mathematica_evaluate_notebook mathematica_edit_notebook    mathematica_export
+mathematica_verify            mathematica_example
 ```
+
+`mathematica_compute` 接受 `code` 或 `code_path`，可选 `working_dir`（Import 相对路径的基准）和 `figure_path`（结果是图形时复制出 PNG）。它只回答「内核算出了什么」，不做 checks 与复算，返回值里 `verified` 永远是 `false`；要交付请用 `mathematica_run`。
 
 全部返回结构化 JSON 文本；内部错误也是 JSON，`isError: true`，不抛栈给客户端。
 工具名前缀 `mathematica_`，不会和官方 Wolfram MCP 冲突。
@@ -280,6 +284,9 @@ Python 再校验 UTF-8 与 U+FFFD。任何字符丢失都判失败，不会交�
 | 有内核无前端 | 能算 `.wl`、能出 PNG、能对账；`.nb` **不能**标 verified |
 | 内核 + 前端 | 完整链路；仍需独立复算通过 |
 | 只在 Linux 跑过 | 不能声称 macOS/Windows 已验证 |
+
+`compute` 不在上表的交付路径里：它只回答「内核算出了什么」，`verified` 永远为 `false`。
+`tests/native` 里的测试是这张表「有内核 + 前端」一行的实际证据；没有运行过就不算。
 
 审查者只需看两样东西：`_validation/validation.json` 的 `findings`，以及 `native` 段里的
 `frontend_used / output_cells / failed_outputs`。

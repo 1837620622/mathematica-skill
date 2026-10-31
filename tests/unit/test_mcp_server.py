@@ -50,7 +50,12 @@ def test_tool_list_has_schemas() -> None:
     response = mcp_server._handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
     tools = response["result"]["tools"]
     names = {tool["name"] for tool in tools}
-    assert {"mathematica_doctor", "mathematica_run", "mathematica_verify"} <= names
+    # 精确集合：新增或删除工具必须同步这里，避免文档和实际接口悄悄不一致。
+    assert names == {
+        "mathematica_doctor", "mathematica_plan", "mathematica_lint", "mathematica_build", "mathematica_run",
+        "mathematica_compute", "mathematica_evaluate_notebook", "mathematica_edit_notebook",
+        "mathematica_export", "mathematica_verify", "mathematica_example",
+    }
     for tool in tools:
         assert tool["inputSchema"]["type"] == "object"
         assert "description" in tool

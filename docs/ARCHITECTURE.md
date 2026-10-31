@@ -13,6 +13,8 @@
 │ mathematica-skill CLI / MCP server           │
 │  ├─ models.py      task.json schema          │
 │  ├─ workflow.py    状态机与门禁               │
+│  ├─ compute.py     快速计算（不进入状态机）     │
+│  ├─ policy.py      危险调用扫描（两条路径共用）  │
 │  ├─ adapter_*      进程启动 / 结果解析        │
 │  ├─ validation.py  校验与白名单               │
 │  ├─ plotqa.py      PNG 只读检查               │
@@ -27,6 +29,7 @@
 │ EvaluateNotebook     │   └──────────────────┘
 │ ExportGraphics       │
 │ VerifyResults        │
+│ ComputeCode          │
 │ + DomainMethods.wl   │
 │ + PlotTheme.wl       │
 └───────┬──────────────┘

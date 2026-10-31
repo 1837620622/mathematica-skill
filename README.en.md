@@ -93,7 +93,8 @@ are adapted, but a platform only counts as verified when a real run has happened
 | Reporting | `validation.json` + `VALIDATION.md`, including an explicit verification-boundary section |
 | Delivery | Whitelisted folder plus a SHA-256 manifest |
 | Installer | `install / update / rollback / uninstall`, only touching files it created |
-| MCP | Nine `mathematica_*` tools over stdio, newline-delimited JSON |
+| Quick compute | `compute`: run one block of Wolfram code and return the result, messages and an optional PNG; never enters the delivery flow, always `verified=false` |
+| MCP | Eleven `mathematica_*` tools over stdio, newline-delimited JSON |
 | Skill | Agent Skills frontmatter; installs into Claude, Codex, Cursor, OpenCode, … |
 
 ## 4. Install (three channels, usable immediately)
@@ -191,6 +192,7 @@ Rules:
 | `run` | Full pipeline; either a verified delivery or an explicit failure state |
 | `build` | Only produce `.nb` and `.wl` (`--draft` needs no Mathematica) |
 | `evaluate` | Run an existing `.nb` in the front end |
+| `compute` | Run one block of Wolfram code and return the result and messages; never a delivery (`verified=false`) |
 | `export` | Export figures and data from real expressions |
 | `verify` | Evaluate checks in a clean kernel, optionally compare with a previous run |
 | `install` / `update` / `uninstall` / `rollback` | Skill and MCP configuration, `--dry-run` supported |
@@ -202,10 +204,12 @@ Rules:
 
 ```
 mathematica_doctor            mathematica_plan             mathematica_lint
-mathematica_build             mathematica_run              mathematica_evaluate_notebook
-mathematica_export            mathematica_verify           mathematica_example
-mathematica_edit_notebook
+mathematica_build             mathematica_run              mathematica_compute
+mathematica_evaluate_notebook mathematica_edit_notebook    mathematica_export
+mathematica_verify            mathematica_example
 ```
+
+`mathematica_compute` takes `code` or `code_path`, plus optional `working_dir` (the base for relative `Import` paths) and `figure_path` (copies out the PNG when the result is a graphic). It only answers "what did the kernel compute": it runs no checks and no re-run, and `verified` is always `false`. Use `mathematica_run` for a delivery.
 
 Every tool returns structured JSON text; internal errors are JSON too, with `isError: true`. The
 `mathematica_` prefix avoids collisions with the official Wolfram MCP server.
@@ -241,6 +245,9 @@ mathematica-skill/
 | Kernel, no front end | `.wl` runs, figures export, checks compare; the `.nb` **cannot** be verified |
 | Kernel and front end | Full pipeline, still subject to the independent re-run |
 | Only tested on Linux | Cannot claim macOS or Windows verification |
+
+`compute` is not on the delivery path above: it only answers "what did the kernel compute", and `verified` is always `false`.
+Tests under `tests/native` are the actual evidence for the "kernel and front end" row; if they have not been run, that row is unproven.
 
 A reviewer only needs two things: `findings` in `_validation/validation.json`, and
 `frontend_used / output_cells / failed_outputs` in the `native` section.

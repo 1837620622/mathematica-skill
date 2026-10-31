@@ -66,10 +66,17 @@ mathematica-skill install --mcp-client opencode
 }
 ```
 
+## 快速试算与正式交付
+
+- 想先看一个公式、积分、ODE 解或图的样子：用 `mathematica-skill compute "<代码>"`（MCP：`mathematica_compute`）。
+  它在真实内核里算，返回最后一个表达式的值、消息和可选 PNG，但**不做 checks、不生成 Notebook、永远 `verified=false`**。
+- 要交付给客户、要能复算的成果：走上面的标准工作流（`run`），只有 `verified=true` 才能交付。
+- 不要把 `compute` 的输出当作已验证的答案写进交付物；交付前先补上 checks，再跑 `run`。
+
 硬规则：
 
 - `code` 必须是真实可执行的 Wolfram Language，不写伪代码。
-- `checks` 必须给可比较的 `expected` 和容差；不能只凭图好看就算对。
+- `checks` 必须给可比较的 `expected` 和容差；不能只凭图好看就算对。至少一条，否则 `run` 在进入内核之前以 `CHECKS_EMPTY` 拦下。
 - 导出表达式必须已经在上面的代码里算好，不能在导出阶段重新发明数据。
 - 图只由 Wolfram `Plot`、`ListPlot`、`Graphics`、`Graphics3D` 等生成；Python 只检查 PNG 的尺寸、完整性和空白异常。
 - `sources` 里的文件会复制进隔离工作区；默认只读，不覆盖用户原件。
@@ -86,6 +93,7 @@ mathematica-skill plan task.json
 mathematica-skill lint task.json
 mathematica-skill run task.json [--out DIR] [--seed N] [--no-rerun]
 mathematica-skill build task.json [--draft] [--out DIR]
+mathematica-skill compute "Integrate[Sin[x], {x, 0, Pi}]" [--file model.wl] [--working-dir DIR] [--figure out.png]
 mathematica-skill evaluate notebook.nb [--out JSON]
 mathematica-skill edit notebook.nb --edits edits.json --out edited.nb
 mathematica-skill edit notebook.nb --op "append_input:..." --in-place

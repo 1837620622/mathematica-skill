@@ -108,6 +108,16 @@ def ensure_dir(path: Path) -> Path:
     return path
 
 
+def unique_path(path: Path) -> Path:
+    """目标已存在时加 -2、-3，与 edit 的输出规则一致：绝不静默覆盖。"""
+    candidate = path
+    index = 2
+    while candidate.exists():
+        candidate = path.with_name(f"{path.stem}-{index}{path.suffix}")
+        index += 1
+    return candidate
+
+
 def is_absolute_like(value: str) -> bool:
     return value.startswith(("/", "\\", "~")) or bool(_DRIVE.match(value))
 

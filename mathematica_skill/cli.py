@@ -17,6 +17,7 @@ from typing import Any
 from . import __version__
 from .adapter_frontend import FrontendAdapter
 from .adapter_wolframscript import WolframscriptAdapter
+from .compute import compute_code, read_code
 from .discovery import detect, summarize
 from .errors import MskError
 from .models import example_document
@@ -105,6 +106,14 @@ def _evaluate(args: argparse.Namespace) -> int:
                             timeout=args.timeout)
     _emit({"ok": run.ok, "payload": run.payload, "stdout": run.stdout[-4000:], "stderr": run.stderr[-4000:]}, True)
     return EXIT_OK if run.ok else EXIT_BLOCKED
+
+
+def _compute(args: argparse.Namespace) -> int:
+    payload = compute_code(read_code(args.code, args.file), out_dir=args.out, timeout=args.timeout,
+                           allow_external=args.allow_external, working_dir=args.working_dir,
+                           figure_path=args.figure)
+    _emit(payload, True)
+    return EXIT_OK
 
 
 def _parse_quick_ops(values: list[str], style: str) -> list[dict[str, Any]]:
@@ -290,6 +299,16 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--out")
     evaluate.add_argument("--timeout", type=float, default=240.0)
     evaluate.set_defaults(func=_evaluate)
+
+    compute = sub.add_parser("compute", help="快速执行一段 Wolfram 代码并返回结果（不做交付）")
+    compute.add_argument("code", nargs="?", help="Wolfram Language 代码；与 --file 二选一")
+    compute.add_argument("--file", help="代码文件（UTF-8）")
+    compute.add_argument("--working-dir", help="Import 相对路径时的基准目录")
+    compute.add_argument("--figure", help="结果是图形时复制出 PNG 到这里（不覆盖已有文件）")
+    compute.add_argument("--out", help="内部工作目录根路径")
+    compute.add_argument("--timeout", type=float, default=120.0)
+    compute.add_argument("--allow-external", action="store_true", help="允许被策略拦截的调用（会写进报告）")
+    compute.set_defaults(func=_compute)
 
     edit = sub.add_parser("edit", help="在既有 .nb 上做定点修改（默认另存新文件）")
     edit.add_argument("notebook")

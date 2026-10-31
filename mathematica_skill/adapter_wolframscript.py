@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import tempfile
 
 from .adapter_base import NativeRun, extract_json, run_process
 from .paths import wolfram_dir
@@ -133,21 +132,10 @@ class WolframscriptAdapter:
             arguments.append(previous)
         return self._run("VerifyResults.wls", arguments, timeout=timeout, result_path=result_json)
 
-    def evaluate_code(self, code: str, *, timeout: float | None = None, cwd: Path | None = None) -> NativeRun:
-        with tempfile.NamedTemporaryFile("w", suffix=".wls", delete=False, encoding="utf-8") as handle:
-            handle.write(code)
-            path = Path(handle.name)
-        try:
-            effective = float(timeout or self.default_timeout)
-            if self._is_wolframscript():
-                command = [self.executable, "-charset", "UTF8", "-timeout", str(int(effective)),
-                           "-file", str(path)]
-            else:
-                escaped = path.as_posix().replace('"', '\\"')
-                command = [self.executable, "-noprompt", "-run", f'Get["{escaped}"]']
-            result = run_process(command, cwd=cwd, timeout=effective)
-            if result.ok:
-                result.payload = {"text": result.stdout.strip()}
-            return result
-        finally:
-            path.unlink(missing_ok=True)
+    def compute_code(self, code_wl: Path, result_json: Path, figure_png: Path, work_dir: Path,
+                     *, timeout: float | None = None) -> NativeRun:
+        """快速计算：结果走 result.json，和其他脚本一样不依赖 stdout。"""
+        effective = float(timeout or self.default_timeout)
+        args: list[str | Path] = [code_wl, result_json, figure_png, work_dir, str(int(effective))]
+        return self._run("ComputeCode.wls", args, timeout=effective, result_path=result_json,
+                         launcher_timeout=effective + 30)
