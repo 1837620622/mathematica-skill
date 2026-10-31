@@ -107,6 +107,17 @@ pip install mathematica-skill               # Python 方式
 npm 包里已经带上 Python 源码与 `wolfram/`，不需要再 `pip install` 一次。
 详见 [docs/INSTALL.md](docs/INSTALL.md)。
 
+### Claude 桌面版（macOS / Windows）
+
+```bash
+mathematica-skill install --mcp-client claude-desktop
+```
+
+- macOS 写入 `~/Library/Application Support/Claude/claude_desktop_config.json`，Windows 写入 `%APPDATA%\Claude\claude_desktop_config.json`。
+- 写入后需要完全退出并重新打开 Claude 桌面版，配置只在启动时读取。
+- 推荐先 `npm i -g mathematica-skill` 或 `pip install` 再执行。`npx` 的包目录在临时缓存里，缓存被清理后配置会失效。
+- 配置里会带上 `PYTHONPATH`（源码或 npm 安装时）和 `PYTHONUTF8`，因为 GUI 宿主不经过 npm 包装脚本。
+
 ```bash
 mathematica-skill doctor --frontend
 ```

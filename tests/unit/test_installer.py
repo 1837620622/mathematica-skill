@@ -153,6 +153,55 @@ def test_opencode_uses_local_type(fake_home: Path, tmp_path: Path) -> None:
     assert isinstance(entry["command"], list)
 
 
+def test_mcp_entry_carries_pythonpath_for_source_installs(fake_home: Path, tmp_path: Path,
+                                                         monkeypatch: pytest.MonkeyPatch) -> None:
+    """npx/源码安装时包目录不在 site-packages 里，GUI 宿主启动时必须靠配置里的 PYTHONPATH 找到它。"""
+    from mathematica_skill import installer
+
+    root = tmp_path / "mathematica-skill"
+    monkeypatch.setattr(installer, "_package_root", lambda: root)
+    entry = installer._mcp_entry()
+    assert entry["env"]["PYTHONPATH"] == str(root)
+    assert entry["env"]["PYTHONUTF8"] == "1"
+
+
+def test_mcp_entry_skips_pythonpath_for_pip_installs(fake_home: Path, tmp_path: Path,
+                                                     monkeypatch: pytest.MonkeyPatch) -> None:
+    from mathematica_skill import installer
+
+    monkeypatch.setattr(installer, "_package_root", lambda: tmp_path / "lib" / "python3.12" / "site-packages")
+    entry = installer._mcp_entry()
+    assert "PYTHONPATH" not in entry["env"]
+    assert entry["env"]["PYTHONUTF8"] == "1"
+
+
+def test_opencode_entry_uses_environment_key(fake_home: Path, tmp_path: Path,
+                                             monkeypatch: pytest.MonkeyPatch) -> None:
+    from mathematica_skill import installer
+
+    monkeypatch.setattr(installer, "_package_root", lambda: tmp_path / "mathematica-skill")
+    entry = installer._mcp_entry(opencode=True)
+    assert "env" not in entry
+    assert entry["environment"]["PYTHONPATH"] == str(tmp_path / "mathematica-skill")
+
+
+def test_codex_toml_env_survives_forced_reinstall(fake_home: Path, tmp_path: Path,
+                                                  monkeypatch: pytest.MonkeyPatch) -> None:
+    """--force 重写 TOML 段时，Windows 路径里的反斜杠不能被正则替换吃掉（曾经会写成 C:\\Users 这种坏值）。"""
+    from mathematica_skill import installer
+
+    root = r"C:\Users\me\mathematica-skill"
+    monkeypatch.setattr(installer, "_package_root", lambda: Path(root))
+    config = tmp_path / "config.toml"
+    config.write_text('model = "x"\n', encoding="utf-8")
+    configure_mcp("codex", config_path=config)
+    configure_mcp("codex", config_path=config, force=True)
+    text = config.read_text(encoding="utf-8")
+    assert text.count("[mcp_servers.mathematica-skill]") == 1
+    assert 'model = "x"' in text
+    assert json.dumps(root) in text
+
+
 def test_rollback_restores_only_its_own_target(fake_home: Path, tmp_path: Path) -> None:
     """两个目标分别备份、分别回滚，不能互相串档。"""
     first = tmp_path / "a"

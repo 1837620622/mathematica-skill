@@ -108,6 +108,17 @@ All three run the same orchestration layer, the same Wolfram scripts and the sam
 The npm tarball already ships the Python source and `wolfram/`, so no second `pip install` is needed.
 See [docs/INSTALL.md](docs/INSTALL.md).
 
+### Claude Desktop (macOS / Windows)
+
+```bash
+mathematica-skill install --mcp-client claude-desktop
+```
+
+- macOS writes `~/Library/Application Support/Claude/claude_desktop_config.json`; Windows writes `%APPDATA%\Claude\claude_desktop_config.json`.
+- Fully quit and reopen Claude Desktop afterwards; the config is read only at launch.
+- Prefer `npm i -g mathematica-skill` or `pip install` before running it. The `npx` package lives in a temporary cache; once the cache is cleared the config breaks.
+- The config carries `PYTHONPATH` (source or npm installs) and `PYTHONUTF8`, because GUI hosts do not go through the npm wrapper.
+
 
 `doctor` answers three questions: is there a kernel, is the licence usable, is there a notebook front end.
 

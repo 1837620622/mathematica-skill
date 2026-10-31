@@ -169,11 +169,13 @@ stdio 服务。客户端配置示例：
     "mathematica-skill": {
       "command": "/usr/bin/python3",
       "args": ["-m", "mathematica_skill.mcp_server"],
-      "env": {}
+      "env": {"PYTHONUTF8": "1", "PYTHONPATH": "/path/to/mathematica-skill"}
     }
   }
 }
 ```
+
+`PYTHONPATH` 只在源码或 npm 安装时需要（pip 安装的包已在 site-packages 里）。`install --mcp-client` 会按安装方式自动写入，手写配置时才需要自己补。
 
 ## 任务字段
 
