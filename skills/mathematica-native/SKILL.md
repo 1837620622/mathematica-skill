@@ -68,7 +68,7 @@ mathematica-skill install --mcp-client opencode
 
 ## 快速试算与正式交付
 
-- 想先看一个公式、积分、ODE 解或图的样子：用 `mathematica-skill compute "<代码>"`（MCP：`mathematica_compute`）。
+- 想先看一个公式、积分、ODE 解或图的样子：用 `mathematica-skill compute "<代码>"`（MCP：`mathematica_compute`）。方法库（如 `msLorenzSolution`）已预加载。
   它在真实内核里算，返回最后一个表达式的值、消息和可选 PNG，但**不做 checks、不生成 Notebook、永远 `verified=false`**。
 - 要交付给客户、要能复算的成果：走上面的标准工作流（`run`），只有 `verified=true` 才能交付。
 - 不要把 `compute` 的输出当作已验证的答案写进交付物；交付前先补上 checks，再跑 `run`。

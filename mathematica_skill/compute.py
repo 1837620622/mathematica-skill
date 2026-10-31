@@ -89,6 +89,7 @@ def compute_code(code: str, *, out_dir: str | Path | None = None, timeout: float
         "result_head": payload.get("result_head", ""),
         "result_tex": payload.get("result_tex", ""),
         "truncated": bool(payload.get("truncated", False)),
+        "libraries": payload.get("libraries", {}),
         "messages": payload.get("messages", []),
         "warnings": [{"severity": "warning", "code": "POLICY_ALLOWED",
                       "message": f"{item['kind']} allowed by allow_external: {item['match']}"}

@@ -91,7 +91,9 @@ mathematica-skill compute --file model.wl --working-dir data/ --figure plot.png
 | `--timeout` | 内核执行上限（秒），默认 120 |
 | `--allow-external` | 允许被策略拦截的调用，降级为 warning 并写进结果 |
 
-返回 JSON：`result`（最后一个表达式的 `InputForm`）、`result_head`、`result_tex`、`truncated`、`messages`、`warnings`、`figure`，以及固定的 `verified: false` 和说明。
+返回 JSON：`result`（最后一个表达式的 `InputForm`）、`result_head`、`result_tex`、`truncated`、`messages`、`warnings`、`figure`、`libraries`，以及固定的 `verified: false` 和说明。
+
+启动时会预加载 `DomainMethods.wl` 与 `PlotTheme.wl`，所以 `msLorenzSolution` 这类函数可以直接调用，不需要 `Get`。`libraries` 报告每个库是否加载成功；某个库失败只影响它自己，不会让整次计算失败。
 
 校验顺序：语法（括号、字符串、注释平衡）→ 危险调用策略（未授权即 `POLICY_BLOCKED`）→ 引擎探测（无内核即 `ENGINE_NOT_FOUND`）→ 内核执行。前三道没过就不启动内核。内核执行失败时返回 `EVALUATION_FAILED`，`details.messages` 带上 Wolfram 的消息。
 

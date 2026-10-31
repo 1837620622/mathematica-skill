@@ -75,6 +75,13 @@ def test_result_is_returned_and_never_verified(monkeypatch: pytest.MonkeyPatch, 
     assert calls[0]["work_dir"] == Path(payload["run_dir"])
 
 
+def test_modelling_libraries_status_is_reported(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """建模库随 compute 预加载；每个库是否加载成功都要回到调用方，而不是静默失败。"""
+    _stub_kernel(monkeypatch, _ok_payload(libraries={"DomainMethods": True, "PlotTheme": False}))
+    payload = compute.compute_code("1 + 1", out_dir=tmp_path)
+    assert payload["libraries"] == {"DomainMethods": True, "PlotTheme": False}
+
+
 def test_working_dir_becomes_kernel_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     calls: list[dict[str, Any]] = []
     _stub_kernel(monkeypatch, _ok_payload(), calls=calls)
