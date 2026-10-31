@@ -74,6 +74,8 @@ jobs:
           ./node_modules/.bin/mathematica-skill --version
           ./node_modules/.bin/mathematica-skill example --write task.json
           ./node_modules/.bin/mathematica-skill lint task.json
+      - name: Install pytest for check.py
+        run: python -m pip install pytest
       - name: Version consistency
         run: python -c "import json,re;print('ok')" && python scripts/check.py
 
@@ -85,7 +87,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install -e .
+      - run: python -m pip install -e . pytest
       - name: Check WL brackets and project lint
         run: python scripts/check.py
 
