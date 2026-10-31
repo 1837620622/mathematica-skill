@@ -518,8 +518,10 @@ def build_only(task_path: str | Path, out_dir: str | Path | None = None, *, draf
         raise EngineNotFound("No licensed Wolfram engine is available; use --draft for an unverified draft.",
                              {"doctor": doctor.to_dict()})
     adapter = WolframscriptAdapter(doctor.wolframscript or doctor.kernel_path, default_timeout=timeout,
-                             kernel_path=doctor.kernel_path)
-    task_json = target / "task.json"
+                                   kernel_path=doctor.kernel_path)
+    # 与 run_task 一致：task.json 和 sources 同目录，Import 才能找到数据文件。
+    document = _copy_inputs(source, target, document)
+    task_json = target / "input" / "task.json"
     document.save(task_json)
     run = adapter.build_notebook(task_json, notebook, code_wl, target / "build.json", timeout=timeout)
     if not run.ok:

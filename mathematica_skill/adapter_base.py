@@ -34,10 +34,14 @@ def _terminate(process: subprocess.Popen) -> None:
         try:
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)],
                            capture_output=True, timeout=30, check=False)
-            return
         except (OSError, subprocess.SubprocessError):
             pass
-        process.kill()
+        # taskkill 可能因为权限或进程已重挂而失败，必须再兜一次。
+        if process.poll() is None:
+            try:
+                process.kill()
+            except OSError:
+                pass
         return
     try:
         os.killpg(process.pid, signal.SIGKILL)

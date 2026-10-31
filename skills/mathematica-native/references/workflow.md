@@ -13,8 +13,9 @@
 
 ```text
 work/<run-id>/
-├── input/                 # 原任务 JSON 和声明的 sources 的隔离副本
-├── task.json              # 规范化后的内部任务
+├── input/
+│   ├── task.json          # 规范化后的内部任务（与 sources 同目录，Import 才找得到）
+│   └── <sources…>         # 原任务 JSON 与声明的数据文件副本
 ├── computation.wl         # 从所有 task.code 拼出的计算脚本
 ├── <title>.nb             # 交付候选 Notebook
 ├── artifacts/             # 原生导出的 PNG/PDF/CSV/XLSX

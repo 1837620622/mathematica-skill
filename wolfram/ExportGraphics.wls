@@ -75,12 +75,17 @@ Do[
       AppendTo[errors, <|"output" -> id, "message" -> "expression did not evaluate: " <> expression|>];
       Continue[]
     ];
-    (* 表达式自己 Export 过时返回值是文件名；这时绝不能拿路径当图去 Rasterize。 *)
-    If[StringQ[value],
-      If[FileExistsQ[value],
-        value = Quiet[Check[Import[value, "Image"], $Failed]],
+    (* 只在出图时处理「表达式自己 Export 过」的情况：返回值是文件名。
+       数据类输出（csv/txt/json）本来就可以是字符串内容，不能拦。
+       同时必须校验 Import 真的拿到 Image，否则会把 $Failed 写进文件。 *)
+    If[StringQ[value] && (kind === "figure" || StringEndsQ[ToLowerCase[filename], ".png"]),
+      value = If[FileExistsQ[value] && ! DirectoryQ[value],
+        Quiet[Check[Import[value, "Image"], $Failed]],
+        $Failed
+      ];
+      If[Head[value] =!= Image,
         AppendTo[errors, <|"output" -> id,
-          "message" -> "expression returned a string, not graphics: " <> expression|>];
+          "message" -> "figure expression returned a string, not an image: " <> expression|>];
         Continue[]
       ]
     ];

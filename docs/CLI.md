@@ -32,7 +32,7 @@ mathematica-skill plan task.json
 mathematica-skill lint task.json [--allow-external]
 ```
 
-返回 `tasks[]`（每个任务的括号/行数）与 `findings[]`。
+返回 `tasks[]`（每个任务 **和每个输出表达式** 各一条括号/行数记录）与 `findings[]`。
 危险调用在未授权时是 error（`POLICY_BLOCKED`），授权后降级为 warning（`POLICY_ALLOWED`）。
 
 ## run

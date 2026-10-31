@@ -100,6 +100,9 @@ def read_png(path: Path) -> dict[str, object]:
     if color_type == 3:
         palette = next((body for kind, body in chunks if kind == b"PLTE"), b"")
         indexes = pixels[::step]
+        if not indexes:
+            result.update({"unique_colors": 0, "most_common_ratio": 1.0, "dark_ratio": None})
+            return result
         colors = Counter(indexes)
         result["unique_colors"] = len(colors)
         result["most_common_ratio"] = round(colors.most_common(1)[0][1] / max(1, len(indexes)), 6)

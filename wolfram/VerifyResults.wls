@@ -42,8 +42,17 @@ msRange[a_, range_List] := NumberQ[a] && Length[range] === 2 &&
   TrueQ[range[[1]] <= a <= range[[2]]];
 
 (* 上一轮把 Rational / Complex / 大表达式序列化成 InputForm 字符串，
-   比较前先还原，否则精确数学的结果永远「不可复现」。 *)
+   比较前先还原，否则精确数学的结果永远「不可复现」。
+
+   previous.json 可能来自外部（verify --previous），所以只还原「看起来像数学表达式」
+   的字符串；含 RunProcess / Import 之类的字符串一律按字面比较，不执行。 *)
+msLooksLikeMath[x_String] := StringLength[x] <= 4000 &&
+  ! StringContainsQ[x, {"RunProcess", "Run[", "Import[", "Get[", "URL", "LibraryLoad",
+                        "SystemOpen", "StartProcess", "CreateProcess"}] &&
+  StringMatchQ[x, RegularExpression["^[0-9A-Za-z .,;:{}()\\[\\]^*/+=<>!@#$%&|~'\"`_-]*$"]];
+
 msRehydrate[x_String] := Module[{parsed},
+  If[! msLooksLikeMath[x], Return[x]];
   parsed = Quiet[Check[ToExpression[x, InputForm], $Failed]];
   If[parsed === $Failed, x, parsed]
 ];

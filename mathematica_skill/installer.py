@@ -62,6 +62,11 @@ def _backup(destination: Path, label: str) -> Path | None:
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     encoded = encode_target(destination)
     root = BACKUPS / f"{stamp}-{label}"
+    # 同一秒内连续备份同一个目标会产生同名目录，copytree 会直接抛 FileExistsError。
+    suffix = 0
+    while root.exists():
+        suffix += 1
+        root = BACKUPS / f"{stamp}-{label}-{suffix}"
     target = root / encoded
     target.parent.mkdir(parents=True, exist_ok=True)
     if destination.is_dir():
@@ -104,7 +109,7 @@ def install(targets: list[Path] | None = None, *, force: bool = False, dry_run: 
         if conflict and not force:
             raise MskError("INSTALL_CONFLICT",
                            f"Existing non-managed skill will not be overwritten: {destination}")
-        if destination.exists():
+        if destination.exists() and not dry_run:
             backup = _backup(destination, "skill")
         else:
             backup = None
@@ -179,8 +184,12 @@ def rollback() -> dict[str, Any]:
         raise MskError("INSTALL_FAILED", "No backup is available.")
     latest = snapshots[-1]
     manifest = _read_manifest()
-    known = {str(Path(entry.get("path", ""))) for entry in manifest.get("targets", [])
-             if isinstance(entry, dict)}
+    known = {
+        str(Path(entry.get("path", "")))
+        for key in ("targets", "mcp")
+        for entry in manifest.get(key, [])
+        if isinstance(entry, dict) and entry.get("path")
+    }
     restored: list[str] = []
     for encoded in latest.iterdir():
         if not encoded.is_dir():
@@ -188,11 +197,18 @@ def rollback() -> dict[str, Any]:
         destination = Path(decode_target(encoded.name))
         if str(destination) not in known:
             continue
-        if destination.exists():
-            shutil.rmtree(destination, ignore_errors=True)
+        nested = encoded / destination.name
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(encoded, destination)
+        if nested.is_file():
+            # 单个文件（例如 MCP 配置）备份成 <encoded>/<name>
+            shutil.copy2(nested, destination)
+        else:
+            if destination.exists():
+                shutil.rmtree(destination, ignore_errors=True)
+            shutil.copytree(encoded, destination)
         restored.append(str(destination))
+    if not restored:
+        raise MskError("INSTALL_FAILED", "the latest backup contains no restorable target")
     return {"ok": True, "restored": restored, "backup": str(latest)}
 
 
