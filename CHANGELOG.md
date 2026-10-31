@@ -11,6 +11,8 @@
   「没有检查记录」和「检查数为 0」都改为 error（此前只是 warning，零检查任务可以走到 verified）。
 - **被门禁拦下的运行也写验收报告**：preflight 阶段拦下时同样写出 `_validation/validation.json` 与 `VALIDATION.md`。
 - **MCP 工具名断言**：`tests/unit/test_mcp_server.py` 改为精确集合比较；README 里的工具数量从错误的 9 改为实际的 11（改动前代码里是 10 个）。
+- **引擎探测超时统一为 60 秒**：此前 `detect` 默认 25 秒，CLI、MCP 和 workflow 里还有 45 秒上限，操作本身的超时（如 `run` 的 900 秒）也会缩短探测。现在所有入口共用 `ENGINE_PROBE_TIMEOUT`。
+- **WL 显式 UTF-8**：所有加载文件的 `Get` 都指定 `CharacterEncoding -> "UTF-8"`，因为 `$CharacterEncoding` 的默认值随平台变化，而 Python 写出的代码和库都是 UTF-8。入口脚本里的中文字符串改为 `\:xxxx` 转义，代码部分只剩 ASCII（有静态测试）。
 
 ### 新增
 - `compute` 子命令与 `mathematica_compute` MCP 工具：在真实内核里执行一段代码，返回最后一个表达式的值、
@@ -21,12 +23,15 @@
 - `tests/native/`：真实内核验收，没有许可证时明确 `skipped: no Wolfram engine`。
 - `tests/integration/test_mcp_launch.py`：用配置里的 command/env 在干净环境启动 MCP。
 
+- **建模库随 compute 预加载**：`DomainMethods.wl` 与 `PlotTheme.wl` 在计算前加载，参考文档里的 `ms*` 函数可以直接调用。结果的 `libraries` 字段报告每个库是否加载成功。`run` 的计算脚本和 Notebook 目前不预加载，见 `references/examples.md`。
+
 ### 删除
 - `WolframscriptAdapter.evaluate_code`：没有调用方、没有测试，由 `compute_code` 替代。
 
 ### 验证范围
-- **已验证**（本环境，无 Mathematica）：静态检查、Python 单元与集成测试（239 通过，3 个 native 测试 skip）、
+- **已验证**（本环境，无 Mathematica）：静态检查、Python 单元与集成测试（246 通过，3 个 native 测试 skip）、
   干净环境下按配置启动 MCP 并列出 11 个工具、零检查门禁在无内核时的拦截、安装器配置合并与 TOML 替换。
+- **已验证（非原生路径，本环境实际执行）**：`run --allow-draft` 得到 draft（退出码 4）；无检查的 `run` 得到 blocked（退出码 3，在预检阶段停止）；`compute` 的无内核、策略拦截、语法错误分别返回 `ENGINE_NOT_FOUND`、`POLICY_BLOCKED`、`INVALID_TASK`；Claude 桌面版配置写入后，MCP 服务能列出 11 个工具并返回结构化错误。
 - **未验证**：所有真内核与前端路径，包括 `compute`、`run`、`tests/native` 和 `ComputeCode.wls` 本身；
   macOS 与 Windows 实机均未运行。
 

@@ -6,13 +6,14 @@
 
 | 项目 | 结果 | 证据 |
 | --- | --- | --- |
-| Python 单元 + 集成测试 | 通过 | `python3 -m pytest -q`：239 通过，3 个 native 测试 skip |
+| Python 单元 + 集成测试 | 通过 | `python3 -m pytest -q`：246 通过，3 个 native 测试 skip |
 | WL 词法/括号检查 | 通过 | `python3 scripts/check.py` |
 | 项目自检（无 Mathematica） | 通过 | `doctor` 正确报告 `engine_usable: false` |
 | 安装器 dry-run 与 MCP 配置合并 | 通过 | `install --target ... --dry-run`；`tests/unit/test_installer.py` |
 | 干净环境按配置启动 MCP | 通过 | `tests/integration/test_mcp_launch.py`（cwd 在仓库外，只带配置里的 env） |
 | MCP 协议（initialize/tools/list/tools/call/错误） | 通过 | `tests/unit/test_mcp_server.py`，工具名为精确集合 |
-| 零检查任务被门禁拦下（无内核） | 通过 | `run` 在进入内核之前以 `CHECKS_EMPTY` 结束，`_validation/` 有报告 |
+| 零检查任务被门禁拦下（无内核） | 通过 | `run` 在进入内核之前以 `CHECKS_EMPTY` 结束（退出码 3），`_validation/` 有报告 |
+| CLI/MCP 非原生路径（本环境实际执行） | 通过 | `run --allow-draft` 得到 draft（退出码 4，`verified=false`）；`compute` 的无内核、策略拦截、语法错误分别返回 `ENGINE_NOT_FOUND`、`POLICY_BLOCKED`、`INVALID_TASK`；MCP `tools/call` 返回结构化错误 |
 | 真内核计算（`compute`、`run`） | **未验证** | 开发环境无 Mathematica；`tests/native` 全部 skip：`skipped: no Wolfram engine` |
 | `ComputeCode.wls` 实际执行 | **未验证** | 没有内核，WL 侧只做了括号平衡检查 |
 | 真前端 Notebook 执行 | **未验证** | 同上 |
