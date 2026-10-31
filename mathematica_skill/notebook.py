@@ -194,11 +194,11 @@ class NotebookBuilder:
 
 
 def _localized(document: TaskDocument, en: str, zh: str) -> str:
-    return zh if document.language == "zh" else en
+    return zh if document.effective_language() == "zh" else en
 
 
 def build_notebook(document: TaskDocument, *, include_assumptions: bool = True) -> NotebookBuilder:
-    builder = NotebookBuilder(document.title, document.language)
+    builder = NotebookBuilder(document.title, document.effective_language())
     builder.add_title(document.title)
     if document.subject:
         builder.add_text(document.subject)

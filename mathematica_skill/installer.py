@@ -62,9 +62,10 @@ def _backup(destination: Path, label: str) -> Path | None:
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     encoded = encode_target(destination)
     root = BACKUPS / f"{stamp}-{label}"
-    # 同一秒内连续备份同一个目标会产生同名目录，copytree 会直接抛 FileExistsError。
+    # 同一秒内重复备份同一个目标才需要新目录；不同目标应共享同一快照，
+    # 否则 rollback 只回滚最后一个目标。
     suffix = 0
-    while root.exists():
+    while (root / encoded).exists():
         suffix += 1
         root = BACKUPS / f"{stamp}-{label}-{suffix}"
     target = root / encoded

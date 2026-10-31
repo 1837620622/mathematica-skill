@@ -84,6 +84,8 @@ are adapted, but a platform only counts as verified when a real run has happened
 | Code quality | Lexical bracket/string/comment check plus a policy scan that blocks risky calls by default |
 | Native compute | Real kernel run; captures `$Failed`, messages, aborts, timeouts |
 | Notebook | Real Input cells, real Output, reopenable and recomputable |
+| Notebook editing | `edit` replaces/inserts/appends cells by index, leaving everything else intact; text is verified after writing, so no mojibake |
+| Language following | `language: "auto"` writes English for English material, Chinese for Chinese, including CJK plot fonts |
 | Figures | 1600×900 / 4K / A4@300dpi presets, aspect preserved with white padding, never stretched |
 | Data | Native `Export` to CSV/XLSX/JSON with a read-back check |
 | Reproduction | Two independent processes, per-check numeric/symbolic comparison with per-task tolerances |
@@ -178,6 +180,7 @@ Rules:
 | `verify` | Evaluate checks in a clean kernel, optionally compare with a previous run |
 | `install` / `update` / `uninstall` / `rollback` | Skill and MCP configuration, `--dry-run` supported |
 | `example` | Print a runnable task JSON |
+| `edit` | Edit an existing `.nb`: replace/insert/append/delete cells, retitle, flip heading language |
 | `mcp serve` | Start the MCP stdio server |
 
 ## 7. MCP tools
@@ -186,6 +189,7 @@ Rules:
 mathematica_doctor            mathematica_plan             mathematica_lint
 mathematica_build             mathematica_run              mathematica_evaluate_notebook
 mathematica_export            mathematica_verify           mathematica_example
+mathematica_edit_notebook
 ```
 
 Every tool returns structured JSON text; internal errors are JSON too, with `isError: true`. The

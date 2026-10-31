@@ -75,6 +75,44 @@ mathematica-skill evaluate notebook.nb [--out evaluate.json] [--timeout 240]
 
 用前端打开、执行、保存、关闭，返回 `output_cells`、`failed_outputs`、`saved`、`messages`。
 
+## edit
+
+```bash
+mathematica-skill edit notebook.nb --edits edits.json --out edited.nb
+mathematica-skill edit notebook.nb --op "append_input:Plot[Sin[x],{x,0,1}]"
+mathematica-skill edit notebook.nb --op "replace_cell:3=x = 1;" --in-place
+mathematica-skill edit notebook.nb --language zh --out zh-version.nb
+```
+
+| 参数 | 作用 |
+| --- | --- |
+| `--edits` | 修改指令 JSON（`operations` / `title` / `language`） |
+| `--op` | 快捷操作，可重复：`append_input:<code>`、`append_text:<text>`、`replace_cell:<n>=<code>`、`delete_cell:<n>`、`insert_after:<n>=<code>` |
+| `--style` | `insert_after` 使用的单元样式，默认 `Input` |
+| `--title` | 替换（或补上）标题单元 |
+| `--language` | 只翻转工具生成的固定标题（Problem/题目、Assumptions/假设、Output:/输出：） |
+| `--out` | 输出路径；省略时同目录 `-edited.nb` |
+| `--in-place` | 覆盖源文件；会先写 `.nb.<stamp>.bak` 备份 |
+
+编辑在 Mathematica 里完成：按单元序号替换、插入、追加、删除，其余单元与样式原样保留。
+写入后会重新 `Import` 回来，逐条核对用户提供的字符串是否原样存在；任何字符丢失或出现
+替换字符（U+FFFD）都判 `ENCODING_MISMATCH`，不会产出乱码文件。
+
+`edits.json` 示例：
+
+```json
+{
+  "language": "zh",
+  "title": "第三次作业",
+  "operations": [
+    {"op": "replace_cell", "index": 4, "content": "sol = NDSolveValue[{x'[t] == -x[t], x[0] == 1}, x, {t, 0, 5}];"},
+    {"op": "insert_after", "index": 4, "style": "Text", "content": "改用解析解对照。"},
+    {"op": "append_input", "content": "Plot[sol[t], {t, 0, 5}, Frame -> True]"},
+    {"op": "delete_cell", "index": 2}
+  ]
+}
+```
+
 ## export
 
 ```bash
@@ -143,7 +181,7 @@ stdio 服务。客户端配置示例：
 | --- | --- | --- |
 | `schema_version` | ✔ | 目前固定 `"1.0"` |
 | `title` | ✔ | 用于目录名与 Notebook 标题 |
-| `language` | | `en` / `zh`，影响 Notebook 小节标题 |
+| `language` | | `en` / `zh` / `auto`；`auto` 从题目与 `sources` 里的 `.nb` 推断，影响小节标题与图内字体 |
 | `subject` | | 学科说明，写在标题下方 |
 | `seed` | | 整数，随机过程必须固定 |
 | `assumptions` | | 字符串数组，写进 Notebook 的「假设」节 |

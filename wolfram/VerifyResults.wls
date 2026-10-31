@@ -24,6 +24,7 @@ taskDir = DirectoryName[ExpandFileName[taskPath]];
 SetDirectory[taskDir];
 SeedRandom[Lookup[task, "seed", 12345]];
 $HistoryLength = 0;
+$msSkillDir = $scriptDir;
 messages = {};
 loadOk = False;
 loadValue = Null;

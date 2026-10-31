@@ -18,6 +18,7 @@ from .adapter_wolframscript import WolframscriptAdapter
 from .discovery import detect
 from .errors import MskError
 from .models import example_document
+from .notebook_edit import NotebookEdit, load_edits, run_edit
 from .workflow import RunOptions, build_only, lint_task, plan_task, run_task
 
 PROTOCOL_DEFAULT = "2025-06-18"
@@ -61,6 +62,17 @@ TOOLS: list[dict[str, Any]] = [
     _tool("mathematica_evaluate_notebook", "用桌面前端执行已有 .nb 并返回结果。",
           {"notebook_path": {"type": "string"}, "out_path": {"type": "string"},
            "timeout": {"type": "number", "default": 240}}, ["notebook_path"]),
+    _tool("mathematica_edit_notebook",
+          "在既有 .nb 上做定点修改（替换/插入/追加单元、改标题、翻转标题语言），默认另存新文件，"
+          "写入后回读校验编码，不会产生乱码。",
+          {"notebook_path": {"type": "string"},
+           "edits_path": {"type": "string", "description": "修改指令 JSON 路径"},
+           "edits": {"type": "object", "description": "也可以直接内联修改指令"},
+           "out_path": {"type": "string", "description": "输出路径；省略则写同目录 -edited.nb"},
+           "in_place": {"type": "boolean", "default": False,
+                        "description": "覆盖源文件，会先备份 .nb.<stamp>.bak"},
+           "timeout": {"type": "number", "default": 240}},
+          ["notebook_path"]),
     _tool("mathematica_export", "从真实 Wolfram 图形导出 PNG/PDF/CSV。",
           {"task_path": {"type": "string"}, "code_path": {"type": "string"}, "out_dir": {"type": "string"},
            "result_path": {"type": "string", "default": "export.json"}, "timeout": {"type": "number", "default": 600}},
@@ -119,6 +131,17 @@ def _call(name: str, arguments: dict[str, Any]) -> Any:
         run = frontend.evaluate(Path(arguments["notebook_path"]).resolve(), out,
                                 timeout=float(arguments.get("timeout", 240)))
         return {"ok": run.ok, "payload": run.payload, "stdout": run.stdout[-4000:], "stderr": run.stderr[-4000:]}
+    if name == "mathematica_edit_notebook":
+        if arguments.get("edits_path"):
+            edit = load_edits(arguments["edits_path"])
+        elif isinstance(arguments.get("edits"), dict):
+            edit = NotebookEdit.from_dict(arguments["edits"])
+        else:
+            raise MskError("INVALID_TASK", "provide edits_path or edits")
+        adapter = _adapter(float(arguments.get("timeout", 240)))
+        return run_edit(adapter, arguments["notebook_path"], arguments.get("out_path"), edit,
+                        allow_in_place=bool(arguments.get("in_place", False)),
+                        timeout=float(arguments.get("timeout", 240)))
     if name == "mathematica_export":
         adapter = _adapter(float(arguments.get("timeout", 600)))
         out = Path(arguments["out_dir"]).resolve()

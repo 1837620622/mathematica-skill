@@ -15,12 +15,13 @@ from typing import Any, Iterable
 
 from . import SCHEMA_VERSION
 from .errors import InvalidTask, UnsafePath
+from .langdetect import resolve_language
 from .paths import resolve_inside, safe_filename, safe_relative
 
 CHECK_KINDS = {"numeric", "boolean", "exact", "expression", "matrix", "list",
                "string", "symbolic", "contains", "range"}
 OUTPUT_KINDS = {"figure", "pdf", "csv", "xlsx", "data"}
-LANGUAGES = {"en", "zh"}
+LANGUAGES = {"en", "zh", "auto"}
 ID_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
 EXTENSIONS = {
     "figure": {".png", ".pdf", ".svg"},
@@ -312,10 +313,35 @@ class TaskDocument:
             "metadata": self.metadata,
         }
 
-    def save(self, path: Path) -> Path:
+    def save(self, path: Path, *, resolve_language: bool = False) -> Path:
         from .jsonio import write_json
 
-        return write_json(path, self.to_dict())
+        payload = self.to_dict()
+        if resolve_language:
+            payload["language"] = self.effective_language()
+        return write_json(path, payload)
+
+    def language_materials(self) -> list[str]:
+        """用于语言判定的自然语言材料，按题目 → 主题 → 假设的顺序。"""
+        parts: list[str] = []
+        for task in self.tasks:
+            parts.append(task.prompt)
+            parts.append(task.notes)
+        parts.extend([self.subject, self.title, *self.assumptions])
+        return [part for part in parts if part]
+
+    def effective_language(self) -> str:
+        """`auto` 时跟随材料语言（例如用户喂的是英文 .nb 就出英文）。"""
+        if self.language != "auto":
+            return self.language
+        materials = self.language_materials()
+        for relative in self.sources:
+            if relative.lower().endswith(".nb"):
+                from .langdetect import notebook_prose, notebook_text
+
+                raw = notebook_text(str(self.base_dir / relative))
+                materials.append(notebook_prose(raw))
+        return resolve_language("auto", *materials)
 
     @property
     def base_dir(self) -> Path:

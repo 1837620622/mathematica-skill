@@ -76,6 +76,7 @@ mathematica-skill verify task.json --code work/run/computation.wl --out verify-2
 | 错误码 | 含义 | 处理 |
 | --- | --- | --- |
 | `INVALID_TASK` | JSON 结构、id、output、check 不合法 | 修 JSON |
+| `ENCODING_MISMATCH` | 编辑后文字无法原样读回 | 检查字体/编码，改回 UTF-8 |
 | `UNSAFE_PATH` | 路径逃逸、绝对路径、Windows 保留名 | 改成相对路径/可移植名 |
 | `ENGINE_NOT_FOUND` | 找不到内核或 wolframscript | 安装 Mathematica/Wolfram Engine |
 | `LICENSE_UNAVAILABLE` | 内核存在但许可证不可用 | 在 Mathematica 里激活；不要绕过 |

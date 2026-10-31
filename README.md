@@ -83,6 +83,8 @@ macOS Apple Silicon 是主要验收平台；Windows / Linux 的路径、进程�
 | 代码质量 | 括号/字符串/注释词法检查 + 危险调用策略检查，默认阻断 |
 | 原生计算 | 真实内核执行，捕获 `$Failed`、消息、`Abort`、超时 |
 | Notebook | 真正的 Input 单元、真实 Output、可重开可再算 |
+| 改 Notebook | `edit` 按单元序号替换/插入/追加，其余不动；写后回读核对，不乱码 |
+| 语言跟随 | `language: "auto"` 时英文作业出英文、中文模版出中文（含图内中文字体） |
 | 图形 | 1600×900 / 4K / A4-300dpi 预设，等比缩放补白，不拉伸 |
 | 数据 | CSV / XLSX / JSON 原生 `Export`，导出后回读校验 |
 | 复算 | 两次独立进程，逐项数值/符号比较，容差写在任务里 |
@@ -183,6 +185,7 @@ mathematica-skill build task.json --draft --out build/
 | `verify` | 干净内核执行 checks，可与上一轮比较 |
 | `install` / `update` / `uninstall` / `rollback` | Skill 安装与 MCP 配置，支持 `--dry-run` |
 | `example` | 输出可运行的任务 JSON |
+| `edit` | 修改既有 `.nb`（替换/插入/追加/删除单元、改标题、翻转标题语言） |
 | `mcp serve` | 启动 MCP stdio 服务 |
 
 ## 7. MCP 工具
@@ -191,6 +194,7 @@ mathematica-skill build task.json --draft --out build/
 mathematica_doctor            mathematica_plan             mathematica_lint
 mathematica_build             mathematica_run              mathematica_evaluate_notebook
 mathematica_export            mathematica_verify           mathematica_example
+mathematica_edit_notebook
 ```
 
 全部返回结构化 JSON 文本；内部错误也是 JSON，`isError: true`，不抛栈给客户端。
@@ -219,6 +223,23 @@ mathematica-skill/
 ├── docs/                     # 架构、CLI、验证、安全、macOS
 └── .github/workflows/        # 静态检查与测试
 ```
+
+## 8.1 语言跟随与 Notebook 修改
+
+`language` 写 `auto` 时按材料判断：题目（`prompt` / `notes` / `subject` / 标题 / 假设）里
+有足够中文就出中文，否则英文；题目为空时再看 `sources` 里的 `.nb` 里是否含中文正文。
+判定只看**含中日韩文字的字符串**，所以英文作业里出现一个中文变量名不会被判成中文。
+
+修改既有 Notebook：
+
+```bash
+mathematica-skill edit 旧作业.nb --edits edits.json --out 新作业.nb
+mathematica-skill edit 旧作业.nb --op "replace_cell:4=sol = DSolveValue[...];" --in-place
+mathematica-skill edit 旧作业.nb --language zh --out 中文版.nb
+```
+
+写入由 Mathematica 完成（`Export[..., "NB"]`），随后脚本重新导入核对每个字符串，
+Python 再校验 UTF-8 与 U+FFFD。任何字符丢失都判失败，不会交付乱码文件。
 
 ## 9. 验证边界（必读）
 

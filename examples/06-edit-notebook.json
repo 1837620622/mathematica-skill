@@ -1,0 +1,10 @@
+{
+  "language": "zh",
+  "title": "第三次作业：修正数值解",
+  "operations": [
+    {"op": "insert_after", "index": 3, "style": "Text",
+     "content": "改用解析解对照数值解，误差应在 1e-6 以内。"},
+    {"op": "append_input", "content": "exact = DSolveValue[{x'[t] == -x[t], x[0] == 1}, x, t];\nPlot[{exact[t], numeric[t]}, {t, 0, 5}, Frame -> True, FrameLabel -> {\"t\", \"x\"}]"},
+    {"op": "append_text", "content": "上图蓝线为解析解，橙线为数值解，二者在给定区间内重合。"}
+  ]
+}

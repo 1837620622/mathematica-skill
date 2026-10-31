@@ -47,7 +47,36 @@ UsingFrontEnd[
 - 不写本机绝对路径、用户名、token、开发说明。
 - 需要读外部数据时用相对 Notebook 目录的路径，并把数据一起交付。
 
-## 4. 修改旧 Notebook
+## 4. 修改旧 Notebook（`edit`）
+
+`wolfram/EditNotebook.wls` 在既有 `.nb` 上做定点修改，其余单元与样式原样保留：
+
+| 操作 | 含义 |
+| --- | --- |
+| `replace_cell` | 把第 n 个单元换成新的 Input 单元 |
+| `insert_after` | 在第 n 个单元后插入指定样式的单元 |
+| `delete_cell` | 删除第 n 个单元 |
+| `append_input` / `append_text` / `append_section` / `append_subsection` | 追加到文末 |
+| `title` | 替换或补上标题单元 |
+| `language` | 只翻转固定标题（Problem↔题目、Assumptions↔假设、Output:↔输出：） |
+
+序号按**文档顺序**数，支持 `CellGroupData` 嵌套；越界会返回 `INVALID_TASK` 而不是乱改。
+
+### 不乱码的三道保险
+
+1. 写 `.nb` 用 `Export[..., "NB"]`，由 Mathematica 自己生成转义，中文/日文/公式都不会坏。
+2. 写完立刻 `Import` 回来，确认用户提供的每个字符串（含多行代码）都能原样读到；
+   比较时忽略空白与换行，只比可见字符。
+3. Python 侧再检查一遍：文件必须是合法 UTF-8、不能含 U+FFFD、Input 单元数不能凭空消失、
+   不能新增本机绝对路径或开发标记。任一不满足 → `ENCODING_MISMATCH` / `EVALUATION_FAILED`。
+
+### 安全
+
+- 默认另存新文件；`--in-place` 才覆盖，且先写 `.nb.<stamp>.bak`。
+- 源文件不是 UTF-8 时直接拒绝，不做「尽力修复」。
+- 图片、样式、单元选项不重建，只替换目标单元。
+
+## 5. 修改旧 Notebook（手工流程）
 
 当前版本优先「读结构 + 生成新 Notebook」。要原地改旧 `.nb`：
 

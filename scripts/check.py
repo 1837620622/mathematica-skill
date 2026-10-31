@@ -106,17 +106,24 @@ def check_skill_frontmatter(failures: list[str]) -> None:
 
 
 def check_examples(failures: list[str]) -> None:
+    import json
+
     from mathematica_skill.models import TaskDocument
+    from mathematica_skill.notebook_edit import NotebookEdit
 
     good = sorted((ROOT / "examples").glob("*.json"))
     if not good:
         failures.append("examples/: 没有示例")
     for path in good:
+        if path.name.startswith("bad-"):
+            continue
         try:
-            TaskDocument.load(path)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict) and "operations" in payload:
+                NotebookEdit.from_dict(payload)      # 编辑指令示例
+            else:
+                TaskDocument.load(path)              # 任务文档示例
         except Exception as exc:  # noqa: BLE001 - 示例必须能被 schema 接受
-            if path.name.startswith("bad-"):
-                continue
             failures.append(f"{path.relative_to(ROOT)}: {exc}")
 
 

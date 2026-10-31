@@ -12,6 +12,8 @@ ERROR_CODES: dict[str, str] = {
     "LICENSE_UNAVAILABLE": "Mathematica/Wolfram Engine is installed but not licensed for use.",
     "FRONTEND_UNAVAILABLE": "No Mathematica notebook frontend could be started.",
     "NOTEBOOK_OPEN_FAILED": "Mathematica could not open the notebook.",
+    "NOTEBOOK_EDIT_FAILED": "The notebook edit was rejected or produced an invalid notebook.",
+    "ENCODING_MISMATCH": "Text did not survive a UTF-8 round trip (possible mojibake).",
     "EVALUATION_FAILED": "Wolfram Language evaluation failed.",
     "PLOT_EXPORT_FAILED": "A native figure or data export failed.",
     "NUMERIC_MISMATCH": "Recomputed results do not match the reference values.",

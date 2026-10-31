@@ -20,6 +20,7 @@ from .adapter_wolframscript import WolframscriptAdapter
 from .discovery import detect, summarize
 from .errors import MskError
 from .models import example_document
+from .notebook_edit import NotebookEdit, load_edits, run_edit
 from .workflow import RunOptions, build_only, lint_task, plan_task, run_task
 
 EXIT_OK = 0
@@ -104,6 +105,47 @@ def _evaluate(args: argparse.Namespace) -> int:
                             timeout=args.timeout)
     _emit({"ok": run.ok, "payload": run.payload, "stdout": run.stdout[-4000:], "stderr": run.stderr[-4000:]}, True)
     return EXIT_OK if run.ok else EXIT_BLOCKED
+
+
+def _parse_quick_ops(values: list[str], style: str) -> list[dict[str, Any]]:
+    """把 `append_input:<code>` / `replace_cell:3=<code>` 解析成操作对象。"""
+    operations: list[dict[str, Any]] = []
+    for raw in values:
+        kind, _, rest = raw.partition(":")
+        if kind in {"replace_cell", "delete_cell", "insert_after"}:
+            index_text, sep, content = rest.partition("=")
+            if not index_text.isdigit():
+                raise MskError("INVALID_TASK", f"--op {raw!r} needs a 1-based cell index, e.g. {kind}:3=...")
+            item: dict[str, Any] = {"op": kind, "index": int(index_text)}
+            if sep:
+                item["content"] = content
+            if kind == "insert_after":
+                item["style"] = style
+            operations.append(item)
+        else:
+            operations.append({"op": kind, "content": rest})
+    return operations
+
+
+def _edit(args: argparse.Namespace) -> int:
+    if args.edits:
+        edit = load_edits(args.edits)
+    else:
+        edit = NotebookEdit(language=args.language or "", title=args.title or "",
+                            operations=[NotebookEdit.from_dict({"operations": [item]}).operations[0]
+                                        for item in _parse_quick_ops(args.op or [], args.style)])
+    if not edit.operations and not edit.language and not edit.title:
+        raise MskError("INVALID_TASK", "edit needs --edits, --op, --title or --language")
+
+    doctor = detect(timeout=min(args.timeout, 45.0))
+    if not doctor.engine_usable:
+        raise MskError("ENGINE_NOT_FOUND", "No usable Wolfram kernel was found.")
+    adapter = WolframscriptAdapter(doctor.wolframscript or doctor.kernel_path, default_timeout=args.timeout,
+                                   kernel_path=doctor.kernel_path)
+    payload = run_edit(adapter, args.notebook, args.out, edit, allow_in_place=args.in_place,
+                       timeout=args.timeout, work_dir=args.work)
+    _emit(payload, True)
+    return EXIT_OK
 
 
 def _export(args: argparse.Namespace) -> int:
@@ -244,6 +286,20 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--out")
     evaluate.add_argument("--timeout", type=float, default=240.0)
     evaluate.set_defaults(func=_evaluate)
+
+    edit = sub.add_parser("edit", help="在既有 .nb 上做定点修改（默认另存新文件）")
+    edit.add_argument("notebook")
+    edit.add_argument("--edits", help="修改指令 JSON")
+    edit.add_argument("--op", action="append", default=[],
+                      help="快捷操作：append_input:<code> / replace_cell:<n>=<code> / delete_cell:<n>")
+    edit.add_argument("--style", default="Input", help="insert_after 使用的单元样式")
+    edit.add_argument("--title", help="替换标题")
+    edit.add_argument("--language", choices=["en", "zh"], help="翻转标题语言（只改固定标题）")
+    edit.add_argument("--out", help="输出路径；默认同目录 -edited.nb")
+    edit.add_argument("--in-place", action="store_true", help="覆盖源文件（会先备份 .bak）")
+    edit.add_argument("--work", help="内部工作目录")
+    edit.add_argument("--timeout", type=float, default=240.0)
+    edit.set_defaults(func=_edit)
 
     export = sub.add_parser("export", help="从真实 WL 表达式导出图和数据")
     export.add_argument("task")

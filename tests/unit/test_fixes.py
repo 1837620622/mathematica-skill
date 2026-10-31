@@ -228,3 +228,45 @@ def test_palette_png_with_zero_height_is_handled(tmp_path: Path) -> None:
     report = read_png(path)
     assert report.get("valid") is True
     assert report.get("unique_colors") == 0
+
+
+def test_two_targets_share_one_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """同一秒备份多个目标时，快照必须共享，回滚才能全部还原。"""
+    import importlib
+
+    from mathematica_skill import installer
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    module = importlib.reload(installer)
+    state = home / ".mathematica-skill"
+    monkeypatch.setattr(module, "BACKUPS", state / "backups")
+    monkeypatch.setattr(module, "MANIFEST", state / "install.json")
+
+    first, second = tmp_path / "a", tmp_path / "b"
+    module.install([first, second])
+    (first / "mathematica-native" / "SKILL.md").write_text("A-orig", encoding="utf-8")
+    (second / "mathematica-native" / "SKILL.md").write_text("B-orig", encoding="utf-8")
+    module.install([first, second], force=True)
+    (first / "mathematica-native" / "SKILL.md").write_text("A-bad", encoding="utf-8")
+    (second / "mathematica-native" / "SKILL.md").write_text("B-bad", encoding="utf-8")
+
+    result = module.rollback()
+    assert len(result["restored"]) == 2
+    assert (first / "mathematica-native" / "SKILL.md").read_text(encoding="utf-8") == "A-orig"
+    assert (second / "mathematica-native" / "SKILL.md").read_text(encoding="utf-8") == "B-orig"
+
+
+def test_rebuild_from_isolated_copy_does_not_copy_onto_itself(tmp_path: Path) -> None:
+    """从 build/input/task.json 再构建时，源与目标是同一个文件，不能抛 SameFileError。"""
+    from mathematica_skill import workflow as wf
+    from mathematica_skill.models import TaskDocument
+
+    run_root = tmp_path / "build"
+    inner = run_root / "input" / "task.json"
+    inner.parent.mkdir(parents=True)
+    inner.write_text(json.dumps(example_document()), encoding="utf-8")
+    document = TaskDocument.load(inner)
+    copied = wf._copy_inputs(inner, run_root, document)
+    assert copied.path == inner.resolve()

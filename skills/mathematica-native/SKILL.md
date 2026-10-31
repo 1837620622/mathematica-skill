@@ -74,6 +74,9 @@ mathematica-skill install --mcp-client opencode
 - 图只由 Wolfram `Plot`、`ListPlot`、`Graphics`、`Graphics3D` 等生成；Python 只检查 PNG 的尺寸、完整性和空白异常。
 - `sources` 里的文件会复制进隔离工作区；默认只读，不覆盖用户原件。
 - 未安装 Mathematica 时用 `--allow-draft`，输出只能标 `draft`。
+- `language` 写 `auto` 时跟随材料：英文作业出英文，中文模版出中文；也可以显式写 `en` / `zh`。
+- 修改旧 `.nb` 用 `edit`：按单元序号替换/插入/追加，默认另存新文件；`--in-place` 会先备份。
+  写入后脚本会重新导入核对每个字符串，字符丢失即 `ENCODING_MISMATCH`，不会交付乱码。
 
 ## 常用命令
 
@@ -84,6 +87,8 @@ mathematica-skill lint task.json
 mathematica-skill run task.json [--out DIR] [--seed N] [--no-rerun]
 mathematica-skill build task.json [--draft] [--out DIR]
 mathematica-skill evaluate notebook.nb [--out JSON]
+mathematica-skill edit notebook.nb --edits edits.json --out edited.nb
+mathematica-skill edit notebook.nb --op "append_input:..." --in-place
 mathematica-skill export task.json --code computation.wl --out artifacts/
 mathematica-skill verify task.json --code computation.wl --out verify.json [--previous verify-1.json]
 mathematica-skill install --mcp-client opencode|claude|codex|cursor|generic

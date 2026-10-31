@@ -116,6 +116,11 @@ class WolframscriptAdapter:
     def inspect_notebook(self, notebook: Path, result_json: Path, *, timeout: float | None = None) -> NativeRun:
         return self.evaluate_notebook(notebook, result_json, mode="reopen", timeout=timeout)
 
+    def edit_notebook(self, source: Path, edits_json: Path, out: Path, result_json: Path,
+                      *, timeout: float | None = None) -> NativeRun:
+        return self._run("EditNotebook.wls", [source, edits_json, out, result_json],
+                         timeout=timeout, result_path=result_json)
+
     def export_artifacts(self, task_json: Path, code_wl: Path, out_dir: Path, result_json: Path,
                          *, timeout: float | None = None) -> NativeRun:
         return self._run("ExportGraphics.wls", [task_json, code_wl, out_dir, result_json],

@@ -19,6 +19,7 @@ SetDirectory[taskDir];
 SeedRandom[Lookup[task, "seed", 12345]];
 $msArtifacts = ExpandFileName[outDir];
 $msTaskDir = taskDir;
+$msSkillDir = $scriptDir;
 $MessageList = {};
 
 (* 等比缩放后再用白边补齐到目标像素，绝不拉伸原图。 *)

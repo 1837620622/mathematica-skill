@@ -37,6 +37,16 @@
 - `scripts/check.py`：编译检查 + 未使用导入 + 行宽 + WL 括号平衡 + pytest。
 - GitHub Actions：三平台静态检查与测试，原生测试标记为 `native` 并跳过（不伪造通过）。
 
+### 0.1.0 追加
+
+- `language: "auto"`：按题目与 `sources` 里的 `.nb` 自动判定中英文，英文作业出英文、
+  中文模版出中文；`PlotTheme` 增加中文图字体选择（PingFang SC / 微软雅黑 / Noto CJK 回退）。
+- `mathematica-skill edit` + MCP `mathematica_edit_notebook` +
+  `wolfram/EditNotebook.wls`：在既有 `.nb` 上按单元序号替换/插入/追加/删除、改标题、
+  翻转固定标题语言。写后重新 Import 核对每个字符串，Python 侧再查 UTF-8 与 U+FFFD，
+  任一不满足即 `ENCODING_MISMATCH`，不产出乱码文件。默认另存新文件，`--in-place` 先备份。
+- 新增 `examples/06-edit-notebook.json`。
+
 ### 验证范围
 
 - 已用真实执行验证：词法检查、schema 校验、PNG 解析、安装器、MCP 协议、无内核/无前端时的失败路径。

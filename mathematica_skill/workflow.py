@@ -101,7 +101,8 @@ def plan_task(task_path: str | Path, options: RunOptions | None = None) -> dict[
     return {
         "ok": True,
         "title": document.title,
-        "language": document.language,
+        "language": document.effective_language(),
+        "language_mode": document.language,
         "seed": document.seed,
         "tasks": [task.to_dict() for task in document.tasks],
         "outputs": [output.to_dict() for output in document.outputs],
@@ -157,7 +158,9 @@ def _lint(document: TaskDocument, *, allow_external: bool, report: ValidationRep
 def _copy_inputs(source: Path, run_dir: Path, document: TaskDocument) -> TaskDocument:
     input_dir = ensure_dir(run_dir / "input")
     copied = input_dir / source.name
-    shutil.copy2(source, copied)
+    # 从工具自己写出的 input/task.json 再次构建时，源和目标是同一个文件。
+    if source.resolve() != copied.resolve():
+        shutil.copy2(source, copied)
     local = TaskDocument.load(copied)
     for relative in document.sources:
         origin = (source.parent / relative).resolve()
@@ -303,7 +306,7 @@ def run_task(task_path: str | Path, options: RunOptions | None = None) -> dict[s
         # 与 sources 放在同一目录：WL 脚本会用 task.json 的目录做 cwd，
         # 用户写 Import["data.csv"] 才能找到同目录下的数据文件。
         task_json = run_dir / "input" / "task.json"
-        document.save(task_json)
+        document.save(task_json, resolve_language=True)
         code_wl = run_dir / "computation.wl"
         code_wl.write_text(build_code_script(document), encoding="utf-8")
         notebook = run_dir / f"{slugify(document.title, 'notebook')}.nb"
@@ -522,7 +525,7 @@ def build_only(task_path: str | Path, out_dir: str | Path | None = None, *, draf
     # 与 run_task 一致：task.json 和 sources 同目录，Import 才能找到数据文件。
     document = _copy_inputs(source, target, document)
     task_json = target / "input" / "task.json"
-    document.save(task_json)
+    document.save(task_json, resolve_language=True)
     run = adapter.build_notebook(task_json, notebook, code_wl, target / "build.json", timeout=timeout)
     if not run.ok:
         raise MskError(run.error_code or "EVALUATION_FAILED", run.message or "native notebook build failed",

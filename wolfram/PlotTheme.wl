@@ -4,7 +4,9 @@
 
 BeginPackage["MathematicaSkill`PlotTheme`"];
 
-msAcademicOptions::usage = "msAcademicOptions[] 返回统一的学术图形选项。";
+msAcademicOptions::usage = "msAcademicOptions[] 返回统一的学术图形选项；传 \"zh\" 使用中文字体。";
+msAcademicFonts::usage = "msAcademicFonts[lang] 返回当前系统上可用的字体设置。";
+msPickFont::usage = "msPickFont[list] 从候选字体里挑一个本机真有的。";
 msAcademicFigure::usage = "msAcademicFigure[g] 给真实 Graphics 应用学术样式。";
 msAcademicPalette::usage = "msAcademicPalette[n] 返回色盲友好的 n 色配色。";
 msExportFigure::usage = "msExportFigure[g, path, width, height] 原生栅格化并导出 PNG。";
@@ -38,13 +40,33 @@ msAcademicPalette[n_Integer] := Take[
   Min[Max[n, 1], 10]
 ];
 
-msAcademicOptions[] := {
+(* 中文图必须用带中文字形的字体，否则就是一片方框；按平台顺序挑第一个装了的。 *)
+msCJKFonts = {"PingFang SC", "Hiragino Sans GB", "Heiti SC", "Songti SC",
+              "Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Source Han Sans SC",
+              "WenQuanYi Micro Hei", "Arial Unicode MS"};
+msLatinFonts = {"Helvetica", "Arial", "DejaVu Sans", "Liberation Sans"};
+
+msPickFont[candidates_List] := Module[{available, hit},
+  available = Quiet[Check[$FontFamilies, {}]];
+  If[! ListQ[available] || available === {},
+    Return[First[candidates]]
+  ];
+  hit = SelectFirst[candidates, MemberQ[available, #] &, ""];
+  If[hit === "", First[candidates], hit]
+];
+
+msAcademicFonts[lang_String: "en"] := Module[{family},
+  family = If[lang === "zh", msPickFont[msCJKFonts], msPickFont[msLatinFonts]];
+  {FontFamily -> family, FontSize -> 11, GrayLevel[0.15]}
+];
+
+msAcademicOptions[lang_String: "en"] := {
   Frame -> True,
   FrameStyle -> Directive[AbsoluteThickness[0.8], GrayLevel[0.25]],
   FrameTicksStyle -> Directive[GrayLevel[0.25], FontSize -> 10],
   Axes -> False,
-  BaseStyle -> {FontFamily -> "Helvetica", FontSize -> 11, GrayLevel[0.15]},
-  LabelStyle -> {FontFamily -> "Helvetica", FontSize -> 11, GrayLevel[0.15]},
+  BaseStyle -> msAcademicFonts[lang],
+  LabelStyle -> msAcademicFonts[lang],
   PlotStyle -> msAcademicPalette[6],
   PlotRangePadding -> Scaled[0.02],
   ImagePadding -> {{55, 18}, {48, 18}},
@@ -53,18 +75,18 @@ msAcademicOptions[] := {
   PlotLegends -> None
 };
 
-msAcademicFigure[g_Graphics] := Show[g, Sequence @@ msAcademicOptions[]];
-msAcademicFigure[g_Graphics3D] := Show[g,
+msAcademicFigure[g_Graphics, lang_String: "en"] := Show[g, Sequence @@ msAcademicOptions[lang]];
+msAcademicFigure[g_Graphics3D, lang_String: "en"] := Show[g,
   Boxed -> True,
   Axes -> True,
   AxesLabel -> Automatic,
-  BaseStyle -> {FontFamily -> "Helvetica", FontSize -> 11},
+  BaseStyle -> msAcademicFonts[lang],
   ImageSize -> 520
 ];
-msAcademicFigure[other_] := other;
+msAcademicFigure[other_, _String: "en"] := other;
 
 msPanelFigure[graphics_List, opts___Rule] := GraphicsGrid[
-  Partition[Map[msAcademicFigure, graphics], UpTo[2]],
+  Partition[Map[msAcademicFigure[#, "en"] &, graphics], UpTo[2]],
   Spacings -> {0.8, 0.8},
   Frame -> None,
   opts
