@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "title": "Sine and its integral",
+  "language": "en",
+  "subject": "Calculus",
+  "seed": 20261031,
+  "assumptions": ["x is real", "angles are in radians"],
+  "sources": [],
+  "tasks": [
+    {
+      "id": "sine",
+      "prompt": "Plot y = sin(x) on [-pi, pi] and compute the exact integral of sin(x) on [0, pi].",
+      "code": "sinePlot = Plot[Sin[x], {x, -Pi, Pi}, Frame -> True, FrameLabel -> {\"x\", \"sin x\"}];\nintegralValue = Integrate[Sin[x], {x, 0, Pi}];\nhalfPiValue = N[Sin[Pi/2]];",
+      "checks": [
+        {"id": "integral_exact", "kind": "symbolic", "expression": "integralValue", "expected": "2",
+         "description": "The exact integral of sin on [0, pi] is 2."},
+        {"id": "half_pi", "kind": "numeric", "expression": "halfPiValue", "expected": 1.0, "abs_tol": 1e-12}
+      ]
+    }
+  ],
+  "outputs": [
+    {"id": "sine_figure", "task": "sine", "kind": "figure", "filename": "sine.png",
+     "expression": "sinePlot", "width": 1600, "height": 900, "dpi": 300, "title": "y = sin(x)"}
+  ],
+  "delivery": {"name": "sine-delivery", "include": ["sine_figure"]},
+  "metadata": {"deliver_code": false}
+}

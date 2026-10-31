@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mathematica-skill"
+version = "0.1.0"
+description = "Native, verifiable Mathematica/Notebook automation for AI agents: CLI, MCP, Agent Skill."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "1837620622" }]
+keywords = ["mathematica", "wolfram", "notebook", "agent-skills", "mcp", "automation"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Mathematics",
+]
+
+[project.scripts]
+mathematica-skill = "mathematica_skill.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/1837620622/mathematica-skill"
+Issues = "https://github.com/1837620622/mathematica-skill/issues"
+
+[tool.setuptools]
+packages = ["mathematica_skill"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+  "native: requires a licensed Wolfram kernel and/or notebook frontend",
+  "integration: exercises several modules together",
+]

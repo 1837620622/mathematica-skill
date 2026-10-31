@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "title": "Lorenz attractor and Lyapunov exponent",
+  "language": "en",
+  "subject": "Nonlinear dynamics",
+  "seed": 20261031,
+  "assumptions": [
+    "parameters sigma=10, rho=28, beta=8/3",
+    "initial condition (1,1,1)",
+    "Lyapunov exponent estimated by two trajectories separated by 1e-8"
+  ],
+  "sources": [],
+  "tasks": [
+    {
+      "id": "lorenz",
+      "prompt": "Integrate the Lorenz system, plot the x-y projection, and estimate the largest Lyapunov exponent.",
+      "code": "lorenzSol = NDSolveValue[{x'[t] == 10 (y[t] - x[t]), y'[t] == x[t] (28 - z[t]) - y[t], z'[t] == x[t] y[t] - (8/3) z[t], x[0] == 1, y[0] == 1, z[0] == 1}, {x, y, z}, {t, 0, 40}, MaxStepSize -> 0.01];\nseries = Table[Through[lorenzSol[t]], {t, 0, 40, 0.01}];\nphasePlot = ListLinePlot[series[[All, {1, 2}]], Frame -> True, FrameLabel -> {\"x\", \"y\"}, PlotLabel -> \"Lorenz\"];\ntangentSol = NDSolveValue[{x'[t] == 10 (y[t] - x[t]), y'[t] == x[t] (28 - z[t]) - y[t], z'[t] == x[t] y[t] - (8/3) z[t], dx'[t] == -10 dx[t] + 10 dy[t], dy'[t] == (28 - z[t]) dx[t] - dy[t] - x[t] dz[t], dz'[t] == y[t] dx[t] + x[t] dy[t] - (8/3) dz[t], x[0] == 1, y[0] == 1, z[0] == 1, dx[0] == 1*^-8, dy[0] == 0, dz[0] == 0}, {dx, dy, dz}, {t, 0, 40}, MaxStepSize -> 0.01];\ntangentNorm = Sqrt[Through[tangentSol[40.]] . Through[tangentSol[40.]]];\nlyapunovMax = Log[tangentNorm/1*^-8]/40.;\nxRange = MinMax[series[[All, 1]]];",
+      "checks": [
+        {"id": "lyapunov_range", "kind": "range", "expression": "lyapunovMax", "expected": [0.5, 1.4],
+         "description": "Largest Lorenz exponent is about 0.9 for these parameters."},
+        {"id": "series_length", "kind": "numeric", "expression": "Length[series]", "expected": 4001},
+        {"id": "x_range", "kind": "range", "expression": "Max[Abs[xRange]]", "expected": [0, 30]},
+        {"id": "deterministic", "kind": "boolean", "expression": "MatrixQ[series, NumberQ]", "expected": true}
+      ]
+    }
+  ],
+  "outputs": [
+    {"id": "phase", "task": "lorenz", "kind": "figure", "filename": "lorenz-phase.png",
+     "expression": "phasePlot", "width": 1600, "height": 1200, "dpi": 300, "title": "Lorenz x-y projection"}
+  ],
+  "delivery": {"name": "lorenz-delivery", "include": ["phase"]},
+  "metadata": {"deliver_code": false}
+}
