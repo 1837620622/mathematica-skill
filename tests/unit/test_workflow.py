@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -97,6 +98,7 @@ def test_engine_without_frontend_never_delivers(monkeypatch: pytest.MonkeyPatch,
     assert not any(path.is_dir() and any(path.iterdir()) for path in deliver_dirs)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="executes a POSIX shell stub; Windows cannot run it")
 def test_open_engine_with_stub_frontend_still_blocks(monkeypatch: pytest.MonkeyPatch, task_file: Path,
                                                      tmp_path: Path, fake_wolframscript: Path) -> None:
     """假内核能「返回成功」，但没有真 Notebook 和真前端，门禁必须拦住。"""
