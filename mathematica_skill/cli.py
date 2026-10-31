@@ -18,7 +18,7 @@ from . import __version__
 from .adapter_frontend import FrontendAdapter
 from .adapter_wolframscript import WolframscriptAdapter
 from .compute import compute_code, read_code
-from .discovery import detect, summarize
+from .discovery import ENGINE_PROBE_TIMEOUT, detect, summarize
 from .errors import MskError
 from .models import example_document
 from .notebook_edit import NotebookEdit, load_edits, run_edit
@@ -95,7 +95,7 @@ def _build(args: argparse.Namespace) -> int:
 
 
 def _evaluate(args: argparse.Namespace) -> int:
-    doctor = detect(deep_frontend=True, timeout=min(args.timeout, 45.0))
+    doctor = detect(deep_frontend=True, timeout=ENGINE_PROBE_TIMEOUT)
     if not doctor.engine_usable:
         raise MskError("ENGINE_NOT_FOUND", "No usable Wolfram kernel was found.")
     adapter = WolframscriptAdapter(doctor.wolframscript or doctor.kernel_path, default_timeout=args.timeout,
@@ -150,7 +150,7 @@ def _edit(args: argparse.Namespace) -> int:
     if not edit.operations and not edit.language and not edit.title:
         raise MskError("INVALID_TASK", "edit needs --edits, --op, --title or --language")
 
-    doctor = detect(timeout=min(args.timeout, 45.0))
+    doctor = detect(timeout=ENGINE_PROBE_TIMEOUT)
     if not doctor.engine_usable:
         raise MskError("ENGINE_NOT_FOUND", "No usable Wolfram kernel was found.")
     adapter = WolframscriptAdapter(doctor.wolframscript or doctor.kernel_path, default_timeout=args.timeout,
@@ -162,7 +162,7 @@ def _edit(args: argparse.Namespace) -> int:
 
 
 def _export(args: argparse.Namespace) -> int:
-    doctor = detect(timeout=min(args.timeout, 45.0))
+    doctor = detect(timeout=ENGINE_PROBE_TIMEOUT)
     if not doctor.engine_usable:
         raise MskError("ENGINE_NOT_FOUND", "No usable Wolfram kernel was found.")
     adapter = WolframscriptAdapter(doctor.wolframscript or doctor.kernel_path, default_timeout=args.timeout,
@@ -176,7 +176,7 @@ def _export(args: argparse.Namespace) -> int:
 
 
 def _verify(args: argparse.Namespace) -> int:
-    doctor = detect(timeout=min(args.timeout, 45.0))
+    doctor = detect(timeout=ENGINE_PROBE_TIMEOUT)
     if not doctor.engine_usable:
         raise MskError("ENGINE_NOT_FOUND", "No usable Wolfram kernel was found.")
     adapter = WolframscriptAdapter(doctor.wolframscript or doctor.kernel_path, default_timeout=args.timeout,
@@ -259,7 +259,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor = sub.add_parser("doctor", help="检测 Wolfram 内核、许可证和前端")
     doctor.add_argument("--frontend", action="store_true", help="额外启动前端探测 Notebook 能力")
-    doctor.add_argument("--timeout", type=float, default=25.0)
+    doctor.add_argument("--timeout", type=float, default=ENGINE_PROBE_TIMEOUT)
     doctor.add_argument("--json", action="store_true")
     doctor.set_defaults(func=_doctor)
 

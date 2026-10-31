@@ -16,7 +16,7 @@ from . import __version__
 from .adapter_frontend import FrontendAdapter
 from .adapter_wolframscript import WolframscriptAdapter
 from .compute import compute_code, read_code
-from .discovery import detect
+from .discovery import ENGINE_PROBE_TIMEOUT, detect
 from .errors import MskError
 from .models import example_document
 from .notebook_edit import NotebookEdit, load_edits, run_edit
@@ -101,7 +101,7 @@ def _json_text(payload: Any) -> str:
 
 
 def _adapter(timeout: float = 600.0) -> WolframscriptAdapter:
-    report = detect(timeout=min(timeout, 45.0))
+    report = detect(timeout=ENGINE_PROBE_TIMEOUT)
     if not report.engine_usable:
         raise MskError("ENGINE_NOT_FOUND", "No usable Wolfram kernel was found.",
                        {"doctor": report.to_dict()})
@@ -141,7 +141,7 @@ def _call(name: str, arguments: dict[str, Any]) -> Any:
                             working_dir=arguments.get("working_dir"), figure_path=arguments.get("figure_path"))
     if name == "mathematica_evaluate_notebook":
         adapter = _adapter(float(arguments.get("timeout", 240)))
-        report = detect(deep_frontend=True, timeout=45.0)
+        report = detect(deep_frontend=True, timeout=ENGINE_PROBE_TIMEOUT)
         frontend = FrontendAdapter(adapter, available=report.frontend_available, detail=report.frontend_detail)
         out = Path(arguments.get("out_path") or "evaluate.json").resolve()
         run = frontend.evaluate(Path(arguments["notebook_path"]).resolve(), out,

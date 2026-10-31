@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .adapter_wolframscript import WolframscriptAdapter
-from .discovery import detect
+from .discovery import ENGINE_PROBE_TIMEOUT, detect
 from .errors import EngineNotFound, InvalidTask, MskError
 from .paths import default_work_root, ensure_dir, unique_path
 from .plotqa import validate_png
@@ -23,8 +23,6 @@ from .policy import scan_policy
 from .wlsyntax import check_syntax
 
 MAX_CODE_CHARS = 200_000
-# Mac 冷启动加许可证校验可能要 30-60 秒（见 docs/MACOS.md），探测太短会误报 ENGINE_NOT_FOUND。
-ENGINE_PROBE_TIMEOUT = 60.0
 NOTE = "快速计算不进入 checks、Notebook 与复算流程，只用于回答问题；可交付成果请使用 run。"
 
 

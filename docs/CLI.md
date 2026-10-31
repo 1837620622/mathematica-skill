@@ -5,7 +5,7 @@
 ## doctor
 
 ```bash
-mathematica-skill doctor [--frontend] [--timeout 25] [--json]
+mathematica-skill doctor [--frontend] [--timeout 60] [--json]
 ```
 
 | 字段 | 含义 |
