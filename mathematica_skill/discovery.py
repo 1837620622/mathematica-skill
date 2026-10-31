@@ -34,10 +34,11 @@ KERNEL_ENV_VARS = ("MATHEMATICA_KERNEL", "WOLFRAM_KERNEL", "WOLFRAMSCRIPT_KERNEL
 SCRIPT_ENV_VARS = ("WOLFRAMSCRIPT", "MATHEMATICA_WOLFRAMSCRIPT")
 
 
-def _run(command: list[str], *, timeout: float = 25.0) -> tuple[int, str, str]:
+def _run(command: list[str], *, timeout: float = 25.0,
+         env: dict[str, str] | None = None) -> tuple[int, str, str]:
     try:
         completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout,
-                                   encoding="utf-8", errors="replace")
+                                   encoding="utf-8", errors="replace", env=env)
         return completed.returncode, completed.stdout, completed.stderr
     except FileNotFoundError:
         return 127, "", "executable not found"
@@ -382,12 +383,15 @@ def _run_wls(script: str, *, wolframscript: Path | None, kernel: Path | None, ti
     with tempfile.NamedTemporaryFile("w", suffix=suffix, delete=False, encoding="utf-8") as handle:
         handle.write(script)
         path = Path(handle.name)
+    probe_env = augmented_env()
     try:
         if wolframscript is not None:
-            return _run([str(wolframscript), "-charset", "UTF8", "-file", str(path)], timeout=timeout)
+            return _run([str(wolframscript), "-charset", "UTF8", "-file", str(path)],
+                        timeout=timeout, env=probe_env)
         if kernel is not None:
             escaped = path.as_posix().replace('"', '\\"')
-            return _run([str(kernel), "-noprompt", "-run", f'Get["{escaped}"]'], timeout=timeout)
+            return _run([str(kernel), "-noprompt", "-run", f'Get["{escaped}"]'],
+                        timeout=timeout, env=probe_env)
         return 127, "", "no kernel or wolframscript"
     finally:
         path.unlink(missing_ok=True)
