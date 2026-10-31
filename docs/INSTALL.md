@@ -77,7 +77,8 @@ ls work/*/deliver/*                        # 交付目录
 ## 接入 Agent
 
 ```bash
-mathematica-skill install --mcp-client claude
+mathematica-skill install --mcp-client claude          # Claude Code
+mathematica-skill install --mcp-client claude-desktop  # Claude 桌面版
 mathematica-skill install --mcp-client codex
 mathematica-skill install --mcp-client opencode
 mathematica-skill install --mcp-client cursor
@@ -86,6 +87,10 @@ mathematica-skill install --dry-run                      # 先看会写哪些文
 ```
 
 `install` 做两件事：
+
+macOS 上 Claude 桌面版的配置文件在
+`~/Library/Application Support/Claude/claude_desktop_config.json`，
+`--mcp-client claude-desktop` 会写到那里；Windows 是 `%APPDATA%\Claude\claude_desktop_config.json`。
 
 1. 把 `mathematica-native` 这一个 Skill 复制到宿主的技能目录；目录里带
    `.mathematica-skill.json` 标记，卸载时只删带标记的目录。

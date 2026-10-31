@@ -323,7 +323,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     install = sub.add_parser("install", help="安装 Skill 到 Agent 技能目录")
     install.add_argument("--target", action="append", default=[], help="可重复；不传则自动检测已知目录")
-    install.add_argument("--mcp-client", choices=["claude", "codex", "cursor", "opencode", "generic"])
+    install.add_argument("--mcp-client", choices=["claude", "claude-desktop", "codex", "cursor", "opencode", "generic"])
     install.add_argument("--config", help="显式指定 MCP 配置文件")
     install.add_argument("--force", action="store_true")
     install.add_argument("--dry-run", action="store_true")

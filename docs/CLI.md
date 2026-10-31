@@ -145,7 +145,7 @@ mathematica-skill rollback
 - 每次写入前备份到 `~/.mathematica-skill/backups/`。
 - `uninstall` 只删带 `.mathematica-skill.json` 标记的目录。
 
-`CLIENT` ∈ `claude` `codex` `cursor` `opencode` `generic`。
+`CLIENT` ∈ `claude`（Claude Code，`~/.claude.json`）`claude-desktop`（`~/Library/Application Support/Claude/claude_desktop_config.json`）`codex` `cursor` `opencode` `generic`。
 
 ## example
 

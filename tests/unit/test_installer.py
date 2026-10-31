@@ -186,3 +186,40 @@ def test_update_with_force_replaces_foreign_directory(fake_home: Path, tmp_path:
     result = update(force=True)
     assert result["ok"] is True
     assert "mathematica-native" in (target / SKILL_NAME / "SKILL.md").read_text(encoding="utf-8")
+
+
+def test_claude_desktop_uses_app_support_on_macos(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib
+
+    from mathematica_skill import installer
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(installer.platform, "system", lambda: "Darwin")
+    module = importlib.reload(installer)
+    monkeypatch.setattr(module, "BACKUPS", home / ".mathematica-skill" / "backups")
+    monkeypatch.setattr(module, "MANIFEST", home / ".mathematica-skill" / "install.json")
+    expected = home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+    assert module.claude_desktop_config() == expected
+    result = module.configure_mcp("claude-desktop")
+    assert result["path"] == str(expected)
+    data = json.loads(expected.read_text(encoding="utf-8"))
+    assert "mathematica-skill" in data["mcpServers"]
+
+
+def test_claude_desktop_uses_appdata_on_windows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib
+
+    from mathematica_skill import installer
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "roaming"))
+    monkeypatch.setattr(installer.platform, "system", lambda: "Windows")
+    module = importlib.reload(installer)
+    monkeypatch.setattr(module, "BACKUPS", tmp_path / "state" / "backups")
+    monkeypatch.setattr(module, "MANIFEST", tmp_path / "state" / "install.json")
+    expected = tmp_path / "roaming" / "Claude" / "claude_desktop_config.json"
+    assert module.claude_desktop_config() == expected

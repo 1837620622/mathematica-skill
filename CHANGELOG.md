@@ -55,6 +55,8 @@
   指向包内源码，不需要二次 `pip install`。
 - `pip install` 现在会把 `wolfram/`、`skills/`、`assets/` 装到 `<prefix>/share/mathematica-skill/`；
   `wolfram_dir()` / `skill_dir()` 覆盖源码树、npm 包、venv、`--user`、`--target` 五种布局。
+- 新增 `--mcp-client claude-desktop`：macOS 写
+  `~/Library/Application Support/Claude/claude_desktop_config.json`，Windows 写 `%APPDATA%\Claude\...`。
 - macOS：补全 `/etc/paths` 与 `/etc/paths.d/*` 到子进程 `PATH`（Finder 启动的进程 PATH 很短）；
   版本排序改读 `.app` 的 `Info.plist`；同版本优先带前端的 `Mathematica.app`；
   `doctor` 新增 `product`、`frontend_capable`、`arch_match`，Wolfram Engine 直接标记无前端，

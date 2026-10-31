@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
+import platform
 import re
 import shutil
 import sys
@@ -269,10 +271,25 @@ def _merge_toml(path: Path, *, force: bool, dry_run: bool) -> dict[str, Any]:
     return {"ok": True, "changed": True, "path": str(path), "dry_run": dry_run}
 
 
+def claude_desktop_config() -> Path:
+    """Claude Desktop 的配置文件路径：macOS 在 Application Support 下，Windows 在 APPDATA。"""
+    home = Path.home()
+    if platform.system() == "Darwin":
+        return home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+    if platform.system() == "Windows":
+        appdata = os.environ.get("APPDATA")
+        base = Path(appdata) if appdata else home / "AppData" / "Roaming"
+        return base / "Claude" / "claude_desktop_config.json"
+    return home / ".config" / "Claude" / "claude_desktop_config.json"
+
+
 def configure_mcp(client: str, *, config_path: Path | None = None, force: bool = False,
                   dry_run: bool = False) -> dict[str, Any]:
     home = Path.home()
-    if client == "claude":
+    if client == "claude-desktop":
+        path = config_path or claude_desktop_config()
+        result = _merge_json(path, opencode=False, force=force, dry_run=dry_run)
+    elif client == "claude":
         path = config_path or home / ".claude.json"
         result = _merge_json(path, opencode=False, force=force, dry_run=dry_run)
     elif client == "cursor":
