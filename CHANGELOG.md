@@ -14,6 +14,9 @@
 - **引擎探测超时统一为 60 秒**：此前 `detect` 默认 25 秒，CLI、MCP 和 workflow 里还有 45 秒上限，操作本身的超时（如 `run` 的 900 秒）也会缩短探测。现在所有入口共用 `ENGINE_PROBE_TIMEOUT`。
 - **WL 显式 UTF-8**：所有加载文件的 `Get` 都指定 `CharacterEncoding -> "UTF-8"`，因为 `$CharacterEncoding` 的默认值随平台变化，而 Python 写出的代码和库都是 UTF-8。入口脚本里的中文字符串改为 `\:xxxx` 转义，代码部分只剩 ASCII（有静态测试）。
 
+- **compute 不再覆盖用户符号**：包装器的变量改为放在 `Module` 里，用户代码里的 `value`、`messages`、`args` 等不再被赋成包装器的内部值（此前 `Simplify[value + 1]` 会算出错误结果，且仍然 `ok: true`）。
+- **图形导出失败不再静默成功**：结果里带上 `figure_error`；调用方要了 PNG 却拿不到时返回 `PLOT_EXPORT_FAILED`，没要图时作为 `FIGURE_NOT_WRITTEN` 警告返回。
+
 ### 新增
 - `compute` 子命令与 `mathematica_compute` MCP 工具：在真实内核里执行一段代码，返回最后一个表达式的值、
   消息和可选 PNG。结果永远 `verified=false`，不进入 checks、Notebook 与复算流程。
