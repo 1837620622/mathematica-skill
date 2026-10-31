@@ -46,17 +46,34 @@ msCJKFonts = {"PingFang SC", "Hiragino Sans GB", "Heiti SC", "Songti SC",
               "WenQuanYi Micro Hei", "Arial Unicode MS"};
 msLatinFonts = {"Helvetica", "Arial", "DejaVu Sans", "Liberation Sans"};
 
-msPickFont[candidates_List] := Module[{available, hit},
+(* 无前端时 $FontFamilies 是 {}，这时只能按平台约定顺序猜；
+   猜的顺序和实际字体包一致，避免在 Linux 上写死 macOS 的 PingFang。 *)
+msPlatformFontOrder[lang_String] := Which[
+  lang === "zh" && $OperatingSystem === "MacOSX",
+    {"PingFang SC", "Hiragino Sans GB", "Heiti SC", "Songti SC", "Arial Unicode MS"},
+  lang === "zh" && $OperatingSystem === "Windows",
+    {"Microsoft YaHei", "SimHei", "SimSun", "Noto Sans CJK SC", "Arial Unicode MS"},
+  lang === "zh",
+    {"Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", "Droid Sans Fallback",
+     "Arial Unicode MS"},
+  $OperatingSystem === "MacOSX", {"Helvetica", "Arial", "DejaVu Sans"},
+  $OperatingSystem === "Windows", {"Arial", "Segoe UI", "Helvetica", "DejaVu Sans"},
+  True, {"DejaVu Sans", "Liberation Sans", "Helvetica", "Arial"}
+];
+
+msPickFont[candidates_List, lang_String: "en"] := Module[{available, ordered, hit},
   available = Quiet[Check[$FontFamilies, {}]];
-  If[! ListQ[available] || available === {},
-    Return[First[candidates]]
+  ordered = If[ListQ[available] && available =!= {},
+    Select[candidates, MemberQ[available, #] &],
+    Select[msPlatformFontOrder[lang], MemberQ[candidates, #] &]
   ];
-  hit = SelectFirst[candidates, MemberQ[available, #] &, ""];
-  If[hit === "", First[candidates], hit]
+  If[ordered === {}, Return[First[candidates]]];
+  hit = SelectFirst[ordered, MemberQ[available, #] &, ""];
+  If[hit === "" || ! ListQ[available] || available === {}, First[ordered], hit]
 ];
 
 msAcademicFonts[lang_String: "en"] := Module[{family},
-  family = If[lang === "zh", msPickFont[msCJKFonts], msPickFont[msLatinFonts]];
+  family = If[lang === "zh", msPickFont[msCJKFonts, lang], msPickFont[msLatinFonts, lang]];
   {FontFamily -> family, FontSize -> 11, GrayLevel[0.15]}
 ];
 

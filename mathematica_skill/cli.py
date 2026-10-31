@@ -129,6 +129,10 @@ def _parse_quick_ops(values: list[str], style: str) -> list[dict[str, Any]]:
 
 def _edit(args: argparse.Namespace) -> int:
     if args.edits:
+        if args.op or args.title or args.language:
+            raise MskError("INVALID_TASK",
+                           "--edits cannot be combined with --op / --title / --language; "
+                           "put them in the edits JSON instead")
         edit = load_edits(args.edits)
     else:
         edit = NotebookEdit(language=args.language or "", title=args.title or "",

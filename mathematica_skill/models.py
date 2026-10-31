@@ -334,14 +334,19 @@ class TaskDocument:
         """`auto` 时跟随材料语言（例如用户喂的是英文 .nb 就出英文）。"""
         if self.language != "auto":
             return self.language
-        materials = self.language_materials()
+        # 题目本身是主证据；sources 里的 Notebook 只作补充，门槛更高。
+        resolved = resolve_language("auto", *self.language_materials())
+        if resolved == "zh":
+            return "zh"
         for relative in self.sources:
-            if relative.lower().endswith(".nb"):
-                from .langdetect import notebook_prose, notebook_text
+            if not relative.lower().endswith(".nb"):
+                continue
+            from .langdetect import notebook_language, notebook_text
 
-                raw = notebook_text(str(self.base_dir / relative))
-                materials.append(notebook_prose(raw))
-        return resolve_language("auto", *materials)
+            raw = notebook_text(str(self.base_dir / relative))
+            if notebook_language(raw) == "zh":
+                return "zh"
+        return "en"
 
     @property
     def base_dir(self) -> Path:

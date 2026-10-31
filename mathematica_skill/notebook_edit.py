@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -127,8 +128,9 @@ def _verify_edit(before: dict[str, Any], after: dict[str, Any], edit: NotebookEd
     deletes = sum(1 for item in edit.operations if item.op == "delete_cell")
     if after["cells"] < before["cells"] - deletes:
         problems.append(f"cell count dropped: {before['cells']} -> {after['cells']}")
-    if before["input_cells"] > 0 and after["input_cells"] == 0:
-        problems.append("all Input cells disappeared")
+    # 显式删掉所有 Input 单元是合法请求；只有「没删却全没了」才是事故。
+    if deletes == 0 and before["input_cells"] > 0 and after["input_cells"] == 0:
+        problems.append("all Input cells disappeared without a delete operation")
     if after["absolute_paths"] and not before["absolute_paths"]:
         problems.append(f"edit introduced absolute paths: {after['absolute_paths'][:3]}")
     if after["forbidden_markers"] and not before["forbidden_markers"]:
@@ -137,12 +139,21 @@ def _verify_edit(before: dict[str, Any], after: dict[str, Any], edit: NotebookEd
 
 
 def plan_output(source: Path, *, suffix: str = "-edited") -> Path:
-    """默认输出路径：与源文件同目录的 `<name><suffix>.nb`，保留中文文件名。"""
+    """默认输出路径：同目录 `<name><suffix>.nb`；已存在则加 -2、-3，绝不静默覆盖。"""
     try:
-        name = safe_filename(f"{source.stem}{suffix}.nb")
+        base = safe_filename(f"{source.stem}{suffix}.nb")
     except UnsafePath:
-        name = f"{slugify(source.stem, 'notebook')}{suffix}.nb"
-    return source.parent / name
+        base = f"{slugify(source.stem, 'notebook')}{suffix}.nb"
+    candidate = source.parent / base
+    if not candidate.exists():
+        return candidate
+    stem, dot, ext = base.rpartition(".")
+    index = 2
+    while True:
+        candidate = source.parent / f"{stem}-{index}{dot}{ext}"
+        if not candidate.exists():
+            return candidate
+        index += 1
 
 
 def run_edit(adapter: Any, source: str | Path, out: str | Path | None, edit: NotebookEdit,
@@ -156,14 +167,26 @@ def run_edit(adapter: Any, source: str | Path, out: str | Path | None, edit: Not
         raise MskError("NOTEBOOK_OPEN_FAILED", f"notebook not found: {origin}")
     _assert_utf8(origin)
 
-    destination = Path(out).expanduser().resolve() if out else plan_output(origin)
+    if out is None and allow_in_place:
+        destination = origin
+    else:
+        destination = Path(out).expanduser().resolve() if out else plan_output(origin)
     in_place = destination == origin
     if in_place and not allow_in_place:
         raise MskError("UNSAFE_PATH",
                        "refusing to overwrite the source notebook; pass --in-place or a new --out path")
 
-    work = ensure_dir(Path(work_dir).expanduser().resolve() if work_dir
-                      else origin.parent / "_edit")
+    if work_dir is not None:
+        work = Path(work_dir).expanduser().resolve()
+        try:
+            work = ensure_dir(work)
+        except OSError as exc:
+            raise MskError("INVALID_TASK", f"cannot create the work directory: {work}",
+                           details={"error": str(exc)}) from exc
+        cleanup = False
+    else:
+        work = Path(tempfile.mkdtemp(prefix="msk-edit-"))
+        cleanup = True
     edits_json = write_json(work / "edits.json", edit.to_dict())
     result_json = work / "edit-result.json"
     target = work / "edited.nb" if in_place else destination
@@ -189,7 +212,7 @@ def run_edit(adapter: Any, source: str | Path, out: str | Path | None, edit: Not
         shutil.move(str(target), str(origin))
         after = inspect_notebook(origin)
 
-    return {
+    result = {
         "ok": True,
         "source": str(origin),
         "notebook": str(origin if in_place else target),
@@ -202,10 +225,17 @@ def run_edit(adapter: Any, source: str | Path, out: str | Path | None, edit: Not
         "messages": payload.get("messages", []),
         "result": payload,
     }
+    if cleanup:
+        shutil.rmtree(work, ignore_errors=True)
+    return result
 
 
 def backup_notebook(source: Path) -> Path:
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     target = source.with_name(f"{source.name}.{stamp}.bak")
+    index = 1
+    while target.exists():
+        target = source.with_name(f"{source.name}.{stamp}-{index}.bak")
+        index += 1
     shutil.copy2(source, target)
     return target

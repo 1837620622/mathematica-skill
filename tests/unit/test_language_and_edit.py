@@ -239,3 +239,125 @@ def test_backup_name_is_adjacent(tmp_path: Path) -> None:
     assert backup.parent == source.parent
     assert backup.name.startswith("作业一.nb.") and backup.name.endswith(".bak")
     assert backup.read_text(encoding="utf-8") == "nb"
+
+
+# ---------- 真实 .nb 是 7-bit 转义，必须能解码 ----------
+
+def _escaped_notebook(*cells: tuple[str, str]) -> str:
+    def esc(text: str) -> str:
+        return "".join("\\:%04x" % ord(ch) if ord(ch) > 127 else ch for ch in text)
+
+    body = ", ".join('Cell["%s", "%s"]' % (esc(text), style) for text, style in cells)
+    return "Notebook[{%s}]" % body
+
+
+def test_wl_escapes_are_decoded() -> None:
+    from mathematica_skill.langdetect import decode_wl_escapes
+
+    assert decode_wl_escapes("\\:9898\\:76ee") == "题目"
+    assert decode_wl_escapes("\\.41") == "A"
+
+
+def test_chinese_template_notebook_detected() -> None:
+    from mathematica_skill.langdetect import notebook_language
+
+    payload = _escaped_notebook(("题目", "Section"), ("请画图并计算积分。", "Text"))
+    assert notebook_language(payload) == "zh"
+
+
+def test_english_template_notebook_stays_english() -> None:
+    from mathematica_skill.langdetect import notebook_language
+
+    payload = ('Notebook[{Cell["Problem 1", "Section"], Cell["Plot the function and compute the '
+               'definite integral over the interval, then explain the result.", "Text"]}]')
+    assert notebook_language(payload) == "en"
+
+
+def test_one_chinese_quote_does_not_flip_english_notebook() -> None:
+    from mathematica_skill.langdetect import notebook_language
+
+    payload = _escaped_notebook(
+        ("Problem 3. Solve the linear system and sketch the phase portrait for the given parameters.", "Text"),
+        ("中文题目：求矩阵的特征值并画出相图", "Text"),
+    )
+    assert notebook_language(payload) == "en"
+
+
+def test_code_heavy_chinese_notebook_detected() -> None:
+    from mathematica_skill.langdetect import notebook_language
+
+    payload = _escaped_notebook(("第三次作业：非线性动力学", "Title"),
+                               ("msSinPlot = Plot[Sin[x], {x, -Pi, Pi}];", "Input"))
+    assert notebook_language(payload) == "zh"
+
+
+def test_short_chinese_cells_sum_up() -> None:
+    from mathematica_skill.langdetect import notebook_language
+
+    payload = _escaped_notebook(("第一题", "Text"), ("求特征值", "Text"), ("第二题", "Text"),
+                                ("画相图", "Text"), ("第三题", "Text"), ("解释结果", "Text"))
+    assert notebook_language(payload) == "zh"
+
+
+# ---------- 编辑行为 ----------
+
+def test_in_place_flag_overwrites_and_backs_up(tmp_path: Path) -> None:
+    from mathematica_skill.notebook_edit import run_edit
+
+    document = TaskDocument.from_dict(example_document())
+    path = build_notebook(document).write(tmp_path / "hw.nb")
+    original = path.read_text(encoding="utf-8")
+
+    class _Adapter:
+        def edit_notebook(self, source, edits, out, result, timeout=None):
+            from mathematica_skill.adapter_base import NativeRun
+
+            Path(out).write_text(original.replace("Sine and its integral", "Edited Title"), encoding="utf-8")
+            Path(result).write_text('{"ok": true, "applied": [], "encoding_ok": true}', encoding="utf-8")
+            return NativeRun(ok=True, payload={"ok": True, "applied": [], "encoding_ok": True})
+
+    result = run_edit(_Adapter(), path, None, NotebookEdit.from_dict(_edit_doc()), allow_in_place=True)
+    assert result["in_place"] is True
+    assert Path(result["backup"]).is_file()
+    assert "Edited Title" in path.read_text(encoding="utf-8")
+    assert Path(result["backup"]).read_text(encoding="utf-8") == original
+
+
+def test_default_output_is_sibling_without_overwriting(tmp_path: Path) -> None:
+    from mathematica_skill.notebook_edit import plan_output
+
+    source = tmp_path / "hw.nb"
+    source.write_text("x", encoding="utf-8")
+    first = plan_output(source)
+    assert first.name == "hw-edited.nb"
+    first.write_text("x", encoding="utf-8")
+    assert plan_output(source).name == "hw-edited-2.nb"
+
+
+def test_backup_does_not_clobber(tmp_path: Path) -> None:
+    from mathematica_skill.notebook_edit import backup_notebook
+
+    source = tmp_path / "hw.nb"
+    source.write_text("v1", encoding="utf-8")
+    first = backup_notebook(source)
+    second = backup_notebook(source)
+    assert first != second
+    assert first.read_text(encoding="utf-8") == "v1"
+
+
+def test_deleting_all_input_cells_is_allowed() -> None:
+    before = {"cells": 4, "input_cells": 2, "absolute_paths": [], "forbidden_markers": []}
+    after = {"cells": 2, "input_cells": 0, "absolute_paths": [], "forbidden_markers": []}
+    edit = NotebookEdit.from_dict({"operations": [{"op": "delete_cell", "index": 1},
+                                                  {"op": "delete_cell", "index": 2}]})
+    assert _verify_edit(before, after, edit) == []
+
+
+def test_cli_rejects_edits_plus_op() -> None:
+    from mathematica_skill.cli import build_parser, main
+
+    parser = build_parser()
+    args = parser.parse_args(["edit", "x.nb", "--edits", "e.json", "--language", "zh"])
+    with pytest.raises(MskError):
+        args.func(args)
+    assert main(["edit", "x.nb", "--edits", "e.json", "--title", "t"]) != 0

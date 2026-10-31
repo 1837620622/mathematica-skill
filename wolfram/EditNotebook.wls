@@ -117,7 +117,9 @@ insertAfter[nb_, index_, style_, content_] := Module[{positions, pos, cell},
 ];
 
 appendCells[nb_, cells_List] := Module[{body, opts},
-  {body, opts} = If[Length[nb] >= 2, {nb[[1]], Drop[Rest[nb], 0]}, {{}, {}}];
+  (* Notebook[{cell}] 只有一个参数；这时 opts 必须是空，绝不能把 body 丢掉。 *)
+  body = If[Length[nb] >= 1, nb[[1]], {}];
+  opts = If[Length[nb] >= 2, Rest[nb], {}];
   If[! ListQ[body], body = {body}];
   AppendTo[applied, <|"op" -> "append", "count" -> Length[cells]|>];
   Notebook[Join[body, cells], Sequence @@ opts]
@@ -143,40 +145,48 @@ headingPairs = {<|"en" -> "Problem", "zh" -> "题目"|>,
                 <|"en" -> "Assumptions", "zh" -> "假设"|>};
 outputPrefixes = <|"en" -> "Output: ", "zh" -> "输出："|>;
 
-retitle[nb_, target_String] := Module[{positions, n, from, to, cell, text, changed = 0},
+(* 前端保存的 Text 单元是 Cell[TextData[{"..."}], "Text"]，不能只看 cell[[1]] 是字符串。 *)
+cellText[cell_] := Which[
+  Length[cell] >= 2 && StringQ[cell[[1]]], cell[[1]],
+  Length[cell] >= 2 && MatchQ[cell[[1]], TextData[{__String}]], StringJoin @@ cell[[1, 1]],
+  Length[cell] >= 2 && MatchQ[cell[[1]], TextData[{___}]], StringJoin @@ Cases[cell[[1]], _String, Infinity],
+  True, $Failed
+];
+
+rewriteCell[cell_, original_TextData, replacement_String] :=
+  ReplacePart[cell, 1 -> TextData[{replacement}]];
+rewriteCell[cell_, _String, replacement_String] := ReplacePart[cell, 1 -> replacement];
+rewriteCell[cell_, _, _] := cell;
+
+retitle[nb_, target_String] := Module[
+  {positions, n, from, to, cell, text, changed = 0, newText, source},
   positions = cellPositions[nb];
   n = Length[positions];
   Do[
     cell = Extract[nb, positions[[i]]];
-    If[Length[cell] >= 2 && StringQ[cell[[1]]],
-      text = cell[[1]];
+    text = cellText[cell];
+    If[StringQ[text],
+      newText = text;
       Do[
         from = If[target === "zh", Lookup[pair, "en"], Lookup[pair, "zh"]];
         to = Lookup[pair, target];
-        If[text === from,
-          nb = ReplacePart[nb, positions[[i]] -> ReplacePart[cell, 1 -> to]];
-          changed++
-        ],
+        If[newText === from, newText = to],
         {pair, headingPairs}
       ];
-      If[StringStartsQ[text, outputPrefixes["en"]] && target === "zh",
-        nb = ReplacePart[nb, positions[[i]] ->
-          ReplacePart[cell, 1 -> outputPrefixes["zh"] <>
-            StringDrop[text, StringLength[outputPrefixes["en"]]]]];
-        changed++
+      If[StringStartsQ[newText, outputPrefixes[If[target === "zh", "en", "zh"]]],
+        newText = outputPrefixes[target] <> StringDrop[newText,
+          StringLength[outputPrefixes[If[target === "zh", "en", "zh"]]]]
       ];
-      If[StringStartsQ[text, outputPrefixes["zh"]] && target === "en",
+      If[newText =!= text,
+        source = If[StringQ[cell[[1]]], "String", "TextData"];
         nb = ReplacePart[nb, positions[[i]] ->
-          ReplacePart[cell, 1 -> outputPrefixes["en"] <>
-            StringDrop[text, StringLength[outputPrefixes["zh"]]]]];
+          rewriteCell[cell, If[source === "String", text, "TextData"], newText]];
         changed++
       ]
     ],
     {i, 1, n}
   ];
-  If[changed > 0, AppendTo[applied, <|"op" -> "set_language", "language" -> target,
-                                      "rewritten" -> changed|>]];
-  AppendTo[applied, <|"op" -> "set_language", "language" -> target|>];
+  AppendTo[applied, <|"op" -> "set_language", "language" -> target, "rewritten" -> changed|>];
   nb
 ];
 
@@ -206,7 +216,13 @@ Do[
       "replace_cell", notebook = replaceCell[notebook, index, ToString[content]],
       "delete_cell", notebook = deleteCell[notebook, index],
       "insert_after", notebook = insertAfter[notebook, index, ToString[style], ToString[content]],
-      "append_input", notebook = appendCells[notebook, {makeCell["Input", ToString[content]]}],
+      "append_input",
+        Module[{cell = makeCell["Input", ToString[content]]},
+          If[cell === $Failed,
+            AppendTo[errors, <|"op" -> "append_input", "message" -> "Wolfram syntax error"|>],
+            notebook = appendCells[notebook, {cell}]
+          ]
+        ],
       "append_text", notebook = appendCells[notebook, {Cell[ToString[content], "Text"]}],
       "append_section", notebook = appendCells[notebook, {Cell[ToString[content], "Section"]}],
       "append_subsection", notebook = appendCells[notebook, {Cell[ToString[content], "Subsection"]}],

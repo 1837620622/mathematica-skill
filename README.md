@@ -226,9 +226,14 @@ mathematica-skill/
 
 ## 8.1 语言跟随与 Notebook 修改
 
-`language` 写 `auto` 时按材料判断：题目（`prompt` / `notes` / `subject` / 标题 / 假设）里
-有足够中文就出中文，否则英文；题目为空时再看 `sources` 里的 `.nb` 里是否含中文正文。
-判定只看**含中日韩文字的字符串**，所以英文作业里出现一个中文变量名不会被判成中文。
+`language` 写 `auto` 时按材料判断：
+
+- 题目（`prompt` / `notes` / `subject` / 标题 / 假设）里汉字 >= 8 且占比 >= 15% → 中文，否则英文。
+- 题目判不出来时看 `sources` 里的 `.nb`：先解码 `\:xxxx` 形式的 7-bit 转义，再比较
+  「中文片段 vs 英文句子」的占比（>= 25%），所以英文作业里引用一句中文不会翻转语言。
+- 代码字符串（含 `[]{};=<>|&_$`）不算英文正文，代码很多的中文作业仍判中文。
+- 图内文字同步换字体：macOS 用 PingFang SC，Windows 用微软雅黑，Linux 用 Noto Sans CJK；
+  无前端时按平台约定顺序挑，不会在 Linux 上写死 macOS 字体。
 
 修改既有 Notebook：
 
@@ -240,6 +245,13 @@ mathematica-skill edit 旧作业.nb --language zh --out 中文版.nb
 
 写入由 Mathematica 完成（`Export[..., "NB"]`），随后脚本重新导入核对每个字符串，
 Python 再校验 UTF-8 与 U+FFFD。任何字符丢失都判失败，不会交付乱码文件。
+
+编辑细节：
+
+- 不给 `--out` 时写同目录 `<名字>-edited.nb`；已存在则自动加 `-2`、`-3`，不静默覆盖。
+- `--in-place` 才覆盖源文件，且先写 `<名字>.nb.<时间戳>.bak`（同秒重名自动加序号）。
+- 内部工作目录用系统临时目录，成功后自动清理，不在用户目录留 `_edit/`。
+- `--edits` 不能和 `--op` / `--title` / `--language` 混用，混用直接报错而不是静默忽略。
 
 ## 9. 验证边界（必读）
 

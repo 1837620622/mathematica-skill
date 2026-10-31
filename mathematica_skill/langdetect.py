@@ -38,9 +38,10 @@ def cjk_stats(text: str) -> tuple[int, int]:
     return cjk, latin
 
 
-def detect_language(text: str, *, default: str = "en") -> str:
+def detect_language(text: str, *, default: str = "en",
+                    min_cjk: int = MIN_CJK, ratio: float = CJK_RATIO) -> str:
     cjk, latin = cjk_stats(text or "")
-    if cjk >= MIN_CJK and cjk / max(1, cjk + latin) >= CJK_RATIO:
+    if cjk >= min_cjk and cjk / max(1, cjk + latin) >= ratio:
         return "zh"
     return default
 
@@ -79,6 +80,37 @@ def _quoted_strings(text: str) -> list[str]:
     return re.findall(r'"(?:\\.|[^"\\])*"', text)
 
 
+# 来自 sources 的证据：中文要够多，且不能只是英文正文里的一句引用。
+NOTEBOOK_MIN_CJK = 8
+NOTEBOOK_CJK_RATIO = 0.25
+
+
+def looks_like_prose(text: str) -> bool:
+    """粗判一个字符串是不是自然语言句子（不是代码、路径、样式名）。"""
+    body = text.strip()
+    if len(body) < 20 or " " not in body:
+        return False
+    if re.search(r"[\[\]{};=<>|&_$]", body):
+        return False
+    return not re.fullmatch(r"[A-Za-z0-9 ./\\:_-]+", body) or body.count(" ") >= 3
+
+
+def notebook_language(text: str, *, default: str = "en") -> str:
+    """整本 Notebook 的语种判定：中文片段 vs 英文句子，而不是只数汉字。"""
+    cjk = cjk_stats(notebook_prose(text))[0]
+    if cjk < NOTEBOOK_MIN_CJK:
+        return default
+    latin_sentences = " ".join(
+        strip_notebook_noise(literal[1:-1])
+        for literal in _quoted_strings(text)
+        if looks_like_prose(strip_notebook_noise(literal[1:-1]))
+    )
+    latin = cjk_stats(latin_sentences)[1]
+    if cjk / max(1, cjk + latin) >= NOTEBOOK_CJK_RATIO:
+        return "zh"
+    return default
+
+
 def notebook_prose(text: str) -> str:
     """只保留「含中日韩文字」的字符串。
 
@@ -87,15 +119,28 @@ def notebook_prose(text: str) -> str:
     """
     chunks: list[str] = []
     for literal in _quoted_strings(text):
-        body = literal[1:-1]
-        if cjk_stats(strip_notebook_noise(body))[0] >= MIN_CJK:
-            chunks.append(strip_notebook_noise(body))
+        body = strip_notebook_noise(literal[1:-1])
+        # 单个字面量只要有 2 个汉字就算「正文片段」，总量门槛由 notebook_language 判。
+        if cjk_stats(body)[0] >= 2:
+            chunks.append(body)
     return "\n".join(chunks)
+
+
+def decode_wl_escapes(text: str) -> str:
+    """还原 Wolfram 的 7-bit 转义。
+
+    真实 .nb 文件是 ASCII 格式，中文写成 \\:4e2d 这种转义；
+    不先解码就永远判不出中文。
+    """
+    decoded = re.sub(r"\\:([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), text)
+    decoded = re.sub(r"\\\.([0-9a-fA-F]{2})", lambda m: chr(int(m.group(1), 16)), decoded)
+    return decoded
 
 
 def strip_notebook_noise(text: str) -> str:
     """去掉框符标记、样式名和转义序列，只留下自然语言。"""
-    cleaned = re.sub(r"\\\[[A-Za-z][A-Za-z0-9]*\]", " ", text)
+    cleaned = decode_wl_escapes(text)
+    cleaned = re.sub(r"\\\[[A-Za-z][A-Za-z0-9]*\]", " ", cleaned)
     cleaned = re.sub(r"\\.", " ", cleaned)
     cleaned = re.sub(r"\b(?:Cell|BoxData|RowBox|TextData|StyleBox|FormBox|Notebook|"
                      r"Title|Subtitle|Section|Subsection|Subsubsection|Text|Input|Output|"

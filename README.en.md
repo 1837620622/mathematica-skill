@@ -85,7 +85,7 @@ are adapted, but a platform only counts as verified when a real run has happened
 | Native compute | Real kernel run; captures `$Failed`, messages, aborts, timeouts |
 | Notebook | Real Input cells, real Output, reopenable and recomputable |
 | Notebook editing | `edit` replaces/inserts/appends cells by index, leaving everything else intact; text is verified after writing, so no mojibake |
-| Language following | `language: "auto"` writes English for English material, Chinese for Chinese, including CJK plot fonts |
+| Language following | `language: "auto"` writes English for English material, Chinese for Chinese, including CJK plot fonts, decided from prompts and from `\:xxxx`-escaped text in source notebooks |
 | Figures | 1600×900 / 4K / A4@300dpi presets, aspect preserved with white padding, never stretched |
 | Data | Native `Export` to CSV/XLSX/JSON with a read-back check |
 | Reproduction | Two independent processes, per-check numeric/symbolic comparison with per-task tolerances |
