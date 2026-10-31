@@ -26,6 +26,8 @@ checks：
 
 文件：`examples/02-lorenz.json`
 
+> 说明：`mathematica_compute` 与 `mathematica-skill compute` 启动时已经预加载 `DomainMethods.wl` 与 `PlotTheme.wl`，直接调用 `ms*` 函数即可，不需要下面的 `Get`。`run` 的计算脚本和 Notebook 目前都没有预加载；下面的 `Get` 写法只适用于在 Notebook 里手动运行，且要求库文件与 Notebook 位于同一目录，这一点尚未在真机验证。
+
 ```wl
 Get["DomainMethods.wl"];
 sol = msLorenzSolution[{10., 28., 8./3.}, {1., 1., 1.}, {0., 40.}];

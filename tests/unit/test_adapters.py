@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,9 @@ from mathematica_skill.adapter_base import NativeRun, extract_json, run_process
 from mathematica_skill.adapter_wolframscript import WolframscriptAdapter
 from mathematica_skill.errors import FrontendUnavailable
 from mathematica_skill.adapter_frontend import FrontendAdapter
+
+# 这些测试执行 #!/bin/sh 假脚本；Windows 不能直接执行它，所以只在 Windows 上跳过，并写明原因。
+POSIX_STUB = pytest.mark.skipif(os.name == "nt", reason="executes a POSIX shell stub; Windows cannot run it")
 
 
 def test_extract_json_from_noisy_stdout() -> None:
@@ -38,6 +42,7 @@ def test_run_process_times_out(tmp_path: Path) -> None:
     assert result.error_code == "TIMEOUT"
 
 
+@POSIX_STUB
 def test_adapter_propagates_native_failure(fake_wolframscript_failure: Path, tmp_path: Path) -> None:
     adapter = WolframscriptAdapter(fake_wolframscript_failure, default_timeout=10)
     run = adapter.evaluate_notebook(tmp_path / "x.nb", tmp_path / "r.json")
@@ -46,6 +51,7 @@ def test_adapter_propagates_native_failure(fake_wolframscript_failure: Path, tmp
     assert "stub failure" in run.message
 
 
+@POSIX_STUB
 def test_adapter_accepts_success_payload(fake_wolframscript: Path, tmp_path: Path) -> None:
     adapter = WolframscriptAdapter(fake_wolframscript, default_timeout=10)
     run = adapter.build_notebook(tmp_path / "t.json", tmp_path / "x.nb", tmp_path / "c.wl", tmp_path / "r.json")
@@ -66,6 +72,7 @@ def test_native_run_defaults_are_false() -> None:
     assert run.payload == {}
 
 
+@POSIX_STUB
 def test_adapter_prefers_result_file_over_stdout(tmp_path: Path) -> None:
     """用户代码打印噪音时，仍应以脚本写出的结果文件为准。"""
     result = tmp_path / "result.json"
@@ -83,6 +90,7 @@ def test_adapter_prefers_result_file_over_stdout(tmp_path: Path) -> None:
     assert run.payload["via"] == "file"
 
 
+@POSIX_STUB
 def test_adapter_ignores_stale_result_file(tmp_path: Path) -> None:
     """上一轮遗留的 result.json 不能被当成这一轮的成功证据。"""
     script = tmp_path / "wolframscript"

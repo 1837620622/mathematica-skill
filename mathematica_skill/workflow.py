@@ -14,12 +14,13 @@ from . import __version__
 from .adapter_frontend import FrontendAdapter
 from .adapter_wolframscript import WolframscriptAdapter
 from .delivery import delivery_folder_name, stage_delivery
-from .discovery import detect
+from .discovery import ENGINE_PROBE_TIMEOUT, detect
 from .errors import DeliveryBlocked, EngineNotFound, MskError
 from .jsonio import file_record, write_json
 from .models import TaskDocument
 from .notebook import build_code_script, build_notebook
 from .paths import default_work_root, ensure_dir, slugify
+from .policy import scan_policy
 from .reporting import write_reports
 from .validation import (
     ValidationReport,
@@ -33,15 +34,6 @@ from .wlsyntax import check_syntax
 STAGES = ("intake", "inspect", "plan", "lint", "preflight", "native_build",
           "native_evaluate", "export", "close", "reopen", "rerun", "compare",
           "review", "deliver")
-
-POLICY_PATTERNS: dict[str, str] = {
-    "process execution": r"\bRun(?:Process)?\s*\[",
-    "remote retrieval": r"\b(?:URLDownload|URLSubmit|URLExecute|URLFetch|URLRead|URLSave)\s*\[",
-    "external file read": r'\b(?:Get|Import|ReadList|FilePrint|OpenRead)\s*\[\s*"(?:/|~|[A-Za-z]:[\\/]|\\\\)',
-    "shell escape": r"\b(?:SystemOpen|StartProcess|CreateProcess)\s*\[",
-    "dynamic code loading":
-        r"\b(?:LibraryLoad|LoadModule|Compile\s*\[[^,]+,\s*[^,]+,\s*CompilationTarget\s*->\s*\"C\")",
-}
 
 
 def _now() -> str:
@@ -122,9 +114,7 @@ def _code_units(document: TaskDocument) -> list[tuple[str, str]]:
 def _policy_findings(document: TaskDocument, *, allow_external: bool) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     for unit_id, code in _code_units(document):
-        for label, pattern in POLICY_PATTERNS.items():
-            for match in re.finditer(pattern, code):
-                findings.append({"task": unit_id, "kind": label, "match": match.group(0)[:120]})
+        findings.extend(scan_policy(code, unit_id))
     if not allow_external:
         for source in document.sources:
             if source.startswith(("http://", "https://", "ftp://")):
@@ -184,7 +174,10 @@ def _inventory(document: TaskDocument, run_dir: Path, *, report: ValidationRepor
             report.add("error", "SOURCE_MISSING", f"declared source is missing: {relative}", relative)
     inventory["checks"] = sum(len(task.checks) for task in document.tasks)
     if inventory["checks"] == 0:
-        report.add("warning", "CHECKS_EMPTY", "no checks are declared; results cannot be compared numerically")
+        # 没有 checks 就没有可比较的结果，任何「通过」都只是程序自己跟自己对；
+        # 记为 error 后，预检之后的流程直接停止，不会进入内核。
+        report.add("error", "CHECKS_EMPTY",
+                   "a verified run needs at least one check; add checks, or use `build` for an unverified notebook")
     return inventory
 
 
@@ -269,12 +262,14 @@ def run_task(task_path: str | Path, options: RunOptions | None = None) -> dict[s
         _record(state, "lint", "completed" if report.ok else "failed", detail={"code": lint})
         # 预检：只有这里通过，才允许进入原生 Wolfram 执行
         doctor = detect(deep_frontend=options.frontend_probe and not options.no_frontend,
-                        timeout=min(max(options.timeout, 20.0), 60.0))
+                        timeout=ENGINE_PROBE_TIMEOUT)
         state["doctor"] = doctor.to_dict()
         if not report.ok:
             _record(state, "preflight", "failed", detail={"errors": [item.to_dict() for item in report.errors()]})
             state["status"] = "blocked"
             state["errors"] = [item.to_dict() for item in report.errors()]
+            # 被拦下的运行也要留下验收报告，审查者靠 validation.json 知道卡在哪一道门。
+            write_reports(run_dir, state, report.to_dict(), doctor.to_dict())
             _save(state)
             return state
         _record(state, "preflight", "completed" if doctor.engine_usable else "failed",
@@ -480,7 +475,7 @@ def run_task(task_path: str | Path, options: RunOptions | None = None) -> dict[s
         state["duration_seconds"] = round(time.monotonic() - started, 3)
         _record(state, "workflow", "failed", message=exc.message, detail=exc.to_dict())
         try:
-            doctor_dict = state.get("doctor") or detect(timeout=20.0).to_dict()
+            doctor_dict = state.get("doctor") or detect(timeout=ENGINE_PROBE_TIMEOUT).to_dict()
             write_reports(run_dir, state, report.to_dict(), doctor_dict)
         except Exception:
             pass
@@ -516,7 +511,7 @@ def build_only(task_path: str | Path, out_dir: str | Path | None = None, *, draf
         code_wl.write_text(build_code_script(document), encoding="utf-8")
         return {"ok": True, "status": "draft", "notebook": str(notebook), "code": str(code_wl),
                 "message": "draft only; no Wolfram kernel verified this notebook"}
-    doctor = detect(timeout=min(timeout, 60.0))
+    doctor = detect(timeout=ENGINE_PROBE_TIMEOUT)
     if not doctor.engine_usable:
         raise EngineNotFound("No licensed Wolfram engine is available; use --draft for an unverified draft.",
                              {"doctor": doctor.to_dict()})

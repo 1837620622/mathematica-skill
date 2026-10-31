@@ -15,7 +15,8 @@ from typing import Any
 from . import __version__
 from .adapter_frontend import FrontendAdapter
 from .adapter_wolframscript import WolframscriptAdapter
-from .discovery import detect
+from .compute import compute_code, read_code
+from .discovery import ENGINE_PROBE_TIMEOUT, detect
 from .errors import MskError
 from .models import example_document
 from .notebook_edit import NotebookEdit, load_edits, run_edit
@@ -59,6 +60,16 @@ TOOLS: list[dict[str, Any]] = [
            "seed": {"type": "integer"}, "overwrite": {"type": "boolean", "default": False},
            "dry_run": {"type": "boolean", "default": False}},
           ["task_path"]),
+    _tool("mathematica_compute",
+          "在真实 Wolfram 内核里执行一段代码，返回最后一个表达式的值和消息；图形结果可导出 PNG。"
+          "快速计算，不做 checks、Notebook 和复算，因此永远 verified=false；可交付成果请用 mathematica_run。",
+          {"code": {"type": "string", "description": "Wolfram Language 代码，最后一个表达式的值即结果"},
+           "code_path": {"type": "string", "description": "代码文件路径，与 code 二选一"},
+           "working_dir": {"type": "string", "description": "Import 相对路径时的基准目录"},
+           "figure_path": {"type": "string", "description": "结果是图形时复制出 PNG 的目标路径（.png）"},
+           "out_dir": {"type": "string", "description": "内部工作目录根路径"},
+           "timeout": {"type": "number", "default": 120},
+           "allow_external": {"type": "boolean", "default": False}}),
     _tool("mathematica_evaluate_notebook", "用桌面前端执行已有 .nb 并返回结果。",
           {"notebook_path": {"type": "string"}, "out_path": {"type": "string"},
            "timeout": {"type": "number", "default": 240}}, ["notebook_path"]),
@@ -90,7 +101,7 @@ def _json_text(payload: Any) -> str:
 
 
 def _adapter(timeout: float = 600.0) -> WolframscriptAdapter:
-    report = detect(timeout=min(timeout, 45.0))
+    report = detect(timeout=ENGINE_PROBE_TIMEOUT)
     if not report.engine_usable:
         raise MskError("ENGINE_NOT_FOUND", "No usable Wolfram kernel was found.",
                        {"doctor": report.to_dict()})
@@ -123,9 +134,14 @@ def _call(name: str, arguments: dict[str, Any]) -> Any:
             overwrite=bool(arguments.get("overwrite", False)),
         )
         return run_task(arguments["task_path"], options)
+    if name == "mathematica_compute":
+        return compute_code(read_code(arguments.get("code"), arguments.get("code_path")),
+                            out_dir=arguments.get("out_dir"), timeout=float(arguments.get("timeout", 120)),
+                            allow_external=bool(arguments.get("allow_external", False)),
+                            working_dir=arguments.get("working_dir"), figure_path=arguments.get("figure_path"))
     if name == "mathematica_evaluate_notebook":
         adapter = _adapter(float(arguments.get("timeout", 240)))
-        report = detect(deep_frontend=True, timeout=45.0)
+        report = detect(deep_frontend=True, timeout=ENGINE_PROBE_TIMEOUT)
         frontend = FrontendAdapter(adapter, available=report.frontend_available, detail=report.frontend_detail)
         out = Path(arguments.get("out_path") or "evaluate.json").resolve()
         run = frontend.evaluate(Path(arguments["notebook_path"]).resolve(), out,

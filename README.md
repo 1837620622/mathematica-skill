@@ -92,7 +92,8 @@ macOS Apple Silicon 是主要验收平台；Windows / Linux 的路径、进程�
 | 报告 | `validation.json` + `VALIDATION.md`，含「验证边界」声明 |
 | 交付 | 白名单目录 + SHA-256 manifest，可核对 |
 | 安装 | npx / npm / pip 三种入口，装完即用；`install / update / rollback / uninstall` 只动自己创建的文件 |
-| MCP | 9 个 `mathematica_*` 工具，stdio 传输，单行 JSON 帧 |
+| 快速计算 | `compute`：执行一段 Wolfram 代码，返回结果、消息和可选 PNG；不进入交付流程，永远 `verified=false` |
+| MCP | 11 个 `mathematica_*` 工具，stdio 传输，单行 JSON 帧 |
 | Skill | 符合 Agent Skills frontmatter，可装到 Claude / Codex / Cursor / OpenCode 等 |
 
 ## 4. 安装（三种入口，装完即用）
@@ -106,6 +107,17 @@ pip install mathematica-skill               # Python 方式
 三条命令行为完全一致：同一套调度层、同一批 Wolfram 脚本、同一个 Skill。
 npm 包里已经带上 Python 源码与 `wolfram/`，不需要再 `pip install` 一次。
 详见 [docs/INSTALL.md](docs/INSTALL.md)。
+
+### Claude 桌面版（macOS / Windows）
+
+```bash
+mathematica-skill install --mcp-client claude-desktop
+```
+
+- macOS 写入 `~/Library/Application Support/Claude/claude_desktop_config.json`，Windows 写入 `%APPDATA%\Claude\claude_desktop_config.json`。
+- 写入后需要完全退出并重新打开 Claude 桌面版，配置只在启动时读取。
+- 推荐先 `npm i -g mathematica-skill` 或 `pip install` 再执行。`npx` 的包目录在临时缓存里，缓存被清理后配置会失效。
+- 配置里会带上 `PYTHONPATH`（源码或 npm 安装时）和 `PYTHONUTF8`，因为 GUI 宿主不经过 npm 包装脚本。
 
 ```bash
 mathematica-skill doctor --frontend
@@ -171,7 +183,7 @@ mathematica-skill build task.json --draft --out build/
 规则：
 
 - `code` 必须是能跑的 Wolfram Language，不写伪代码。
-- `checks` 必须给可比较的 `expected` 和容差；没检查就等于没验证。
+- `checks` 必须给可比较的 `expected` 和容差；没检查就等于没验证。至少要有一条，否则 `run` 在进入内核之前以 `CHECKS_EMPTY` 拦下。
 - `outputs[].expression` 必须在前面的代码里算过。
 - `sources` 只能是相对路径，运行时会复制进隔离目录。
 - `delivery.include` 决定哪些 output 进客户目录。
@@ -188,6 +200,7 @@ mathematica-skill build task.json --draft --out build/
 | `run` | 完整流水线，产出 verified 交付或明确的失败状态 |
 | `build` | 只生成 `.nb` + `.wl`（`--draft` 无需 Mathematica） |
 | `evaluate` | 用前端执行一个已有 `.nb` |
+| `compute` | 快速执行一段 Wolfram 代码，返回结果与消息；不做交付，永远 `verified=false` |
 | `export` | 从真实表达式导出 PNG/PDF/CSV/XLSX |
 | `verify` | 干净内核执行 checks，可与上一轮比较 |
 | `install` / `update` / `uninstall` / `rollback` | Skill 安装与 MCP 配置，支持 `--dry-run` |
@@ -199,10 +212,12 @@ mathematica-skill build task.json --draft --out build/
 
 ```
 mathematica_doctor            mathematica_plan             mathematica_lint
-mathematica_build             mathematica_run              mathematica_evaluate_notebook
-mathematica_export            mathematica_verify           mathematica_example
-mathematica_edit_notebook
+mathematica_build             mathematica_run              mathematica_compute
+mathematica_evaluate_notebook mathematica_edit_notebook    mathematica_export
+mathematica_verify            mathematica_example
 ```
+
+`mathematica_compute` 接受 `code` 或 `code_path`，可选 `working_dir`（Import 相对路径的基准）和 `figure_path`（结果是图形时复制出 PNG）。它只回答「内核算出了什么」，不做 checks 与复算，返回值里 `verified` 永远是 `false`；要交付请用 `mathematica_run`。
 
 全部返回结构化 JSON 文本；内部错误也是 JSON，`isError: true`，不抛栈给客户端。
 工具名前缀 `mathematica_`，不会和官方 Wolfram MCP 冲突。
@@ -270,6 +285,9 @@ Python 再校验 UTF-8 与 U+FFFD。任何字符丢失都判失败，不会交�
 | 内核 + 前端 | 完整链路；仍需独立复算通过 |
 | 只在 Linux 跑过 | 不能声称 macOS/Windows 已验证 |
 
+`compute` 不在上表的交付路径里：它只回答「内核算出了什么」，`verified` 永远为 `false`。
+`tests/native` 里的测试是这张表「有内核 + 前端」一行的实际证据；没有运行过就不算。
+
 审查者只需看两样东西：`_validation/validation.json` 的 `findings`，以及 `native` 段里的
 `frontend_used / output_cells / failed_outputs`。
 
@@ -288,6 +306,7 @@ Python 再校验 UTF-8 与 U+FFFD。任何字符丢失都判失败，不会交�
 python3 -m pip install -e .
 python3 -m pytest -q                     # 单元测试（不需要 Mathematica）
 python3 scripts/check.py                 # 词法检查 + WL 括号平衡 + 测试
+python3 -m pytest tests/native -m native -ra   # 装有 Mathematica 的机器上跑真实验收（无许可证会 skip）
 ```
 
 需要真实内核的测试标记为 `@pytest.mark.native`，在普通 CI 上跳过，**不会**假装通过。

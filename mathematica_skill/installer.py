@@ -215,12 +215,32 @@ def rollback() -> dict[str, Any]:
     return {"ok": True, "restored": restored, "backup": str(latest)}
 
 
+def _package_root() -> Path:
+    """包源码所在目录：pip 安装时在 site-packages 下；npm 包或源码运行时就是包目录本身。"""
+    return Path(__file__).resolve().parent.parent
+
+
+def _runtime_env() -> dict[str, str]:
+    """写进 MCP 配置的环境变量。
+
+    Claude Desktop 等 GUI 宿主直接启动 `python -m mathematica_skill.mcp_server`，不经过 npm 包装脚本，
+    包装脚本设置的 PYTHONPATH 不会带过来；npx 安装时包目录又在临时缓存里，所以必须显式写出。
+    pip 安装的包已经在 site-packages 里，不需要 PYTHONPATH。
+    """
+    env = {"PYTHONUTF8": "1"}
+    root = _package_root()
+    if not {"site-packages", "dist-packages"} & set(root.parts):
+        env["PYTHONPATH"] = str(root)
+    return env
+
+
 def _mcp_entry(*, opencode: bool = False) -> dict[str, Any]:
     command = [sys.executable, "-m", "mathematica_skill.mcp_server"]
+    env = _runtime_env()
     if opencode:
-        # OpenCode 的 MCP 配置格式：type=local，command 是数组，enabled 显式开启。
-        return {"type": "local", "command": command, "enabled": True}
-    return {"command": command[0], "args": command[1:], "env": {}}
+        # OpenCode 的 MCP 配置格式：type=local，command 是数组，enabled 显式开启，环境变量叫 environment。
+        return {"type": "local", "command": command, "enabled": True, "environment": env}
+    return {"command": command[0], "args": command[1:], "env": env}
 
 
 def _merge_json(path: Path, *, opencode: bool, force: bool, dry_run: bool) -> dict[str, Any]:
@@ -252,15 +272,18 @@ def _merge_json(path: Path, *, opencode: bool, force: bool, dry_run: bool) -> di
 def _merge_toml(path: Path, *, force: bool, dry_run: bool) -> dict[str, Any]:
     section = "[mcp_servers.mathematica-skill]"
     text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    env = ", ".join(f"{json.dumps(key)} = {json.dumps(value)}" for key, value in _runtime_env().items())
     block = (f"{section}\n"
              f"command = {json.dumps(sys.executable)}\n"
-             f"args = [\"-m\", \"mathematica_skill.mcp_server\"]\n")
+             f"args = [\"-m\", \"mathematica_skill.mcp_server\"]\n"
+             f"env = {{{env}}}\n")
     if section in text:
         if not force:
             return {"ok": True, "changed": False, "path": str(path),
                     "message": "mathematica-skill is already configured; use --force to replace"}
         pattern = re.compile(re.escape(section) + r".*?(?=\n\[|\Z)", re.S)
-        text = pattern.sub(block.rstrip(), text)
+        # 用函数而不是字符串作替换：block 里有 Windows 路径的反斜杠，字符串形式会被 re 当作转义。
+        text = pattern.sub(lambda _match: block.rstrip(), text)
     else:
         text = (text.rstrip() + "\n\n" + block) if text.strip() else block
     if not dry_run:

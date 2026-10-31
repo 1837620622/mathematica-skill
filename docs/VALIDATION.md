@@ -6,16 +6,19 @@
 
 | 项目 | 结果 | 证据 |
 | --- | --- | --- |
-| Python 单元测试 | 通过 | `python3 -m pytest -q`（见下） |
+| Python 单元 + 集成测试 | 通过 | `python3 -m pytest -q`：246 通过，3 个 native 测试 skip |
 | WL 词法/括号检查 | 通过 | `python3 scripts/check.py` |
 | 项目自检（无 Mathematica） | 通过 | `doctor` 正确报告 `engine_usable: false` |
-| 安装器 dry-run | 通过 | `install --target ... --dry-run` |
-| MCP 协议（initialize/tools/list/tools/call/错误） | 通过 | `tests/unit/test_mcp_server.py` |
-| 真内核计算 | **未验证** | 开发环境无 Mathematica |
-| 真前端 Notebook 执行 | **未验证** | 开发环境无 Mathematica |
+| 安装器 dry-run 与 MCP 配置合并 | 通过 | `install --target ... --dry-run`；`tests/unit/test_installer.py` |
+| 干净环境按配置启动 MCP | 通过 | `tests/integration/test_mcp_launch.py`（cwd 在仓库外，只带配置里的 env） |
+| MCP 协议（initialize/tools/list/tools/call/错误） | 通过 | `tests/unit/test_mcp_server.py`，工具名为精确集合 |
+| 零检查任务被门禁拦下（无内核） | 通过 | `run` 在进入内核之前以 `CHECKS_EMPTY` 结束（退出码 3），`_validation/` 有报告 |
+| CLI/MCP 非原生路径（本环境实际执行） | 通过 | `run --allow-draft` 得到 draft（退出码 4，`verified=false`）；`compute` 的无内核、策略拦截、语法错误分别返回 `ENGINE_NOT_FOUND`、`POLICY_BLOCKED`、`INVALID_TASK`；MCP `tools/call` 返回结构化错误 |
+| 真内核计算（`compute`、`run`） | **未验证** | 开发环境无 Mathematica；`tests/native` 全部 skip：`skipped: no Wolfram engine` |
+| `ComputeCode.wls` 实际执行 | **未验证** | 没有内核，WL 侧只做了括号平衡检查 |
+| 真前端 Notebook 执行 | **未验证** | 同上 |
 | 原生 PNG 尺寸/图面 | **未验证** | 同上 |
 | macOS 实机端到端 | **未验证** | 需要在装有 Mathematica 的机器上执行 |
-| Windows / Linux 实机 | **未验证** | 同上 |
 
 > 说明：本仓库的开发环境（iSH / Alpine aarch64）没有 Wolfram 内核，因此所有
 > `ENGINE_NOT_FOUND` 分支都是**真实**跑过的，而需要许可证的链路全部标为未验证。
@@ -34,10 +37,14 @@ mathematica-skill doctor --json
 
 ```bash
 mathematica-skill doctor --frontend --json > doctor.json
+python3 -m pytest tests/native -m native -ra        # 真内核 + 前端的端到端验收
+mathematica-skill compute "Integrate[Sin[x], {x, 0, Pi}]"
 mathematica-skill run examples/01-sine.json --out work --seed 20261031
 # 期望：state.json 里 status=verified, verified=true
 # 期望：_validation/validation.json 里 findings 无 error, reproduction.all_reproduced=true
 ```
+
+`tests/native` 的输出里，`PASSED` 才是证据；`SKIPPED` 的原因会写明缺什么，不能当作通过。
 
 把 `doctor.json` 关键字段、`state.json` 的 status、`validation.json` 的摘要贴回本文件，
 并在 `COMPATIBILITY.md` 对应行标注「已验证」，才算完成该平台的验收。

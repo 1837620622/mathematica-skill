@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -97,6 +98,7 @@ def test_engine_without_frontend_never_delivers(monkeypatch: pytest.MonkeyPatch,
     assert not any(path.is_dir() and any(path.iterdir()) for path in deliver_dirs)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="executes a POSIX shell stub; Windows cannot run it")
 def test_open_engine_with_stub_frontend_still_blocks(monkeypatch: pytest.MonkeyPatch, task_file: Path,
                                                      tmp_path: Path, fake_wolframscript: Path) -> None:
     """假内核能「返回成功」，但没有真 Notebook 和真前端，门禁必须拦住。"""
@@ -107,6 +109,22 @@ def test_open_engine_with_stub_frontend_still_blocks(monkeypatch: pytest.MonkeyP
         run_task(task_file, RunOptions(work_root=tmp_path / "work", frontend_probe=False))
     assert excinfo.value.code == "DELIVERY_BLOCKED"
     assert not any((tmp_path / "work").rglob("deliver"))
+
+
+def test_run_without_checks_is_blocked_before_native_work(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+                                                         task_payload: dict) -> None:
+    """没有 checks 的任务不能进入 verified；门禁要在原生阶段之前拦下，并留下验收报告。"""
+    task_payload["tasks"][0]["checks"] = []
+    path = tmp_path / "nochecks.json"
+    path.write_text(json.dumps(task_payload), encoding="utf-8")
+    monkeypatch.setattr(workflow, "detect", _no_engine)
+    state = run_task(path, RunOptions(work_root=tmp_path / "work"))
+    assert state["status"] == "blocked"
+    assert state["verified"] is False
+    assert [item["code"] for item in state["errors"]] == ["CHECKS_EMPTY"]
+    assert "native_build" not in [stage["stage"] for stage in state["stages"]]
+    report = json.loads((Path(state["run_dir"]) / "_validation" / "validation.json").read_text(encoding="utf-8"))
+    assert report["ok"] is False
 
 
 def test_policy_block_short_circuits(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,

@@ -88,13 +88,15 @@ mathematica-skill install --dry-run                      # 先看会写哪些文
 
 `install` 做两件事：
 
-macOS 上 Claude 桌面版的配置文件在
-`~/Library/Application Support/Claude/claude_desktop_config.json`，
-`--mcp-client claude-desktop` 会写到那里；Windows 是 `%APPDATA%\Claude\claude_desktop_config.json`。
-
 1. 把 `mathematica-native` 这一个 Skill 复制到宿主的技能目录；目录里带
    `.mathematica-skill.json` 标记，卸载时只删带标记的目录。
 2. 往宿主 MCP 配置里合并一个 `mathematica-skill` 键，不覆盖其他 MCP。
+
+Claude 桌面版的配置文件：macOS 在 `~/Library/Application Support/Claude/claude_desktop_config.json`，
+Windows 在 `%APPDATA%\Claude\claude_desktop_config.json`。写入后要完全退出并重新打开 Claude 桌面版，
+配置只在启动时读取。配置里的 `env` 会带上 `PYTHONPATH`（源码或 npm 安装时）和 `PYTHONUTF8`，
+因为桌面版不经过 npm 包装脚本。`npx` 的包目录在临时缓存里，缓存被清理后要重新执行一次 `install`，
+或者改用 `npm i -g` / `pip install` 后再安装。
 
 已有同名目录且不是本工具装的 → `INSTALL_CONFLICT`，要 `--force`；`--force` 前会先备份。
 

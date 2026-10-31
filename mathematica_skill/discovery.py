@@ -29,6 +29,9 @@ from typing import Any
 PROBE_BEGIN = "MSK_JSON_BEGIN"
 PROBE_END = "MSK_JSON_END"
 FRONTEND_MARKER = "MSK_FRONTEND_OK"
+# 引擎探测只回答「内核能不能启动、许可证能不能用」，与具体操作的超时无关。
+# Mac 冷启动加许可证校验可能要 30-60 秒（见 docs/MACOS.md），太短会把能用的内核误报成不可用。
+ENGINE_PROBE_TIMEOUT = 60.0
 
 KERNEL_ENV_VARS = ("MATHEMATICA_KERNEL", "WOLFRAM_KERNEL", "WOLFRAMSCRIPT_KERNELPATH")
 SCRIPT_ENV_VARS = ("WOLFRAMSCRIPT", "MATHEMATICA_WOLFRAMSCRIPT")
@@ -495,7 +498,7 @@ class EngineReport:
         return self.to_dict().get(key, default)
 
 
-def detect(*, deep_frontend: bool = False, timeout: float = 25.0) -> EngineReport:
+def detect(*, deep_frontend: bool = False, timeout: float = ENGINE_PROBE_TIMEOUT) -> EngineReport:
     report = EngineReport(platform_system=platform.system(), platform_release=platform.release(),
                           machine=platform.machine(), python=platform.python_version())
     wolframscript = find_wolframscript()

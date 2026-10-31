@@ -6,7 +6,7 @@
    自己的排版都会保留，Mathematica 打开后可以重新解析并计算。 *)
 
 $scriptDir = If[$InputFileName === "", Directory[], DirectoryName[ExpandFileName[$InputFileName]]];
-Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}]];
+Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}], CharacterEncoding -> "UTF-8"];
 
 args = msArgs[];
 If[Length[args] < 4,
@@ -24,8 +24,8 @@ tasks = Lookup[task, "tasks", {}];
 outputs = Lookup[task, "outputs", {}];
 assumptions = Lookup[task, "assumptions", {}];
 
-problemHeading = If[language === "zh", "题目", "Problem"];
-assumptionHeading = If[language === "zh", "假设", "Assumptions"];
+problemHeading = If[language === "zh", "\:9898\:76ee", "Problem"];
+assumptionHeading = If[language === "zh", "\:5047\:8bbe", "Assumptions"];
 
 (* 直接把字符串当 Text 单元内容：Mathematica 会按文本排版，保留换行与转义。 *)
 textCell[text_String] := Cell[text, "Text"];
@@ -69,7 +69,7 @@ Do[
     taskOutputs = Select[outputs, ToString[Lookup[#, "task", ""]] === id &];
     Do[
       caption = ToString[Lookup[output, "title", Lookup[output, "filename", "Output"]]];
-      AppendTo[cells, textCell[If[language === "zh", "输出：" <> caption, "Output: " <> caption]]];
+      AppendTo[cells, textCell[If[language === "zh", "\:8f93\:51fa\:ff1a" <> caption, "Output: " <> caption]]];
       display = inputCells[ToString[Lookup[output, "expression", ""]]];
       If[display === $Failed,
         msFail["EVALUATION_FAILED",
