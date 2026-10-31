@@ -81,6 +81,11 @@ def compute_code(code: str, *, out_dir: str | Path | None = None, timeout: float
         raise MskError(run.error_code or "EVALUATION_FAILED", run.message or "computation failed",
                        details={"messages": payload.get("messages", []), "stderr": run.stderr[-4000:]})
 
+    figure = _figure(payload, figure_png, figure_path)
+    warnings = [{"severity": "warning", "code": "POLICY_ALLOWED",
+                 "message": f"{item['kind']} allowed by allow_external: {item['match']}"}
+                for item in findings]
+    warnings += _figure_notes(payload, figure, figure_path)
     return {
         "ok": True,
         "verified": False,
@@ -91,10 +96,8 @@ def compute_code(code: str, *, out_dir: str | Path | None = None, timeout: float
         "truncated": bool(payload.get("truncated", False)),
         "libraries": payload.get("libraries", {}),
         "messages": payload.get("messages", []),
-        "warnings": [{"severity": "warning", "code": "POLICY_ALLOWED",
-                      "message": f"{item['kind']} allowed by allow_external: {item['match']}"}
-                     for item in findings],
-        "figure": _figure(payload, figure_png, figure_path),
+        "warnings": warnings,
+        "figure": figure,
         "seconds": payload.get("seconds", 0.0),
         "run_dir": str(run_dir),
     }
@@ -116,3 +119,21 @@ def _figure(payload: dict[str, Any], figure_png: Path, figure_path: str | Path |
         ensure_dir(target.parent)
         shutil.copy2(figure_png, target)
     return {**png, "path": str(target)}
+
+
+def _figure_notes(payload: dict[str, Any], figure: dict[str, Any] | None,
+                  figure_path: str | Path | None) -> list[dict[str, str]]:
+    """没有生成图时说明原因。调用方明确要了图却拿不到，是错误，不能静默成功。"""
+    if figure is not None:
+        return []
+    reason = str(payload.get("figure_error") or "")
+    if reason and figure_path is not None:
+        raise MskError("PLOT_EXPORT_FAILED", "the result is a graphic, but no PNG could be written",
+                       details={"figure_error": reason})
+    if reason:
+        message = reason
+    elif figure_path is not None:
+        message = f"the result is {payload.get('result_head') or 'not a graphic'}; no PNG was written"
+    else:
+        return []
+    return [{"severity": "warning", "code": "FIGURE_NOT_WRITTEN", "message": message}]

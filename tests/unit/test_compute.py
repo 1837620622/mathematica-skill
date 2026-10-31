@@ -221,3 +221,30 @@ def test_cli_compute_parses_code_and_figure() -> None:
     assert args.code == "Plot[x, {x, 0, 1}]"
     assert args.figure == "p.png"
     assert args.timeout == 30.0
+
+
+def test_requested_figure_that_cannot_be_exported_is_an_error(monkeypatch: pytest.MonkeyPatch,
+                                                              tmp_path: Path) -> None:
+    """图形导出失败、又明确要了 PNG 时，必须报错并带上诊断，不能静默成功。"""
+    _stub_kernel(monkeypatch, _ok_payload(result_head="Graphics", figure_error="Rasterize or Export raised a message"))
+    with pytest.raises(MskError) as excinfo:
+        compute.compute_code("Plot[Sin[x], {x, 0, Pi}]", out_dir=tmp_path, figure_path=tmp_path / "plot.png")
+    assert excinfo.value.code == "PLOT_EXPORT_FAILED"
+    assert excinfo.value.details["figure_error"] == "Rasterize or Export raised a message"
+
+
+def test_unrequested_graphic_export_failure_is_a_warning(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _stub_kernel(monkeypatch, _ok_payload(result_head="Graphics", figure_error="Export did not create the PNG file"))
+    payload = compute.compute_code("Plot[Sin[x], {x, 0, Pi}]", out_dir=tmp_path)
+    assert payload["ok"] is True
+    assert payload["figure"] is None
+    assert payload["warnings"][0]["code"] == "FIGURE_NOT_WRITTEN"
+    assert "Export did not create" in payload["warnings"][0]["message"]
+
+
+def test_requested_figure_for_non_graphic_result_warns(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _stub_kernel(monkeypatch, _ok_payload(result_head="Integer"))
+    payload = compute.compute_code("1 + 1", out_dir=tmp_path, figure_path=tmp_path / "plot.png")
+    assert payload["figure"] is None
+    assert payload["warnings"][0]["code"] == "FIGURE_NOT_WRITTEN"
+    assert "Integer" in payload["warnings"][0]["message"]
