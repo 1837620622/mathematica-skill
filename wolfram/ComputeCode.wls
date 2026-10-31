@@ -4,7 +4,7 @@
    这里不做策略检查（那是 Python 的职责），也不生成任何交付物。 *)
 
 $scriptDir = If[$InputFileName === "", Directory[], DirectoryName[ExpandFileName[$InputFileName]]];
-Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}]];
+Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}], CharacterEncoding -> "UTF-8"];
 
 args = msArgs[];
 If[Length[args] < 4,
@@ -25,7 +25,7 @@ started = AbsoluteTime[];
 value = $Failed;
 messages = {};
 Block[{$MessageList = {}},
-  value = Quiet[Check[TimeConstrained[Get[codePath], maxSeconds, $Aborted], $Failed]];
+  value = Quiet[Check[TimeConstrained[Get[codePath, CharacterEncoding -> "UTF-8"], maxSeconds, $Aborted], $Failed]];
   messages = msMessageText[$MessageList];
 ];
 

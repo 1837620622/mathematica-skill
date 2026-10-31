@@ -3,7 +3,7 @@
    第二次运行时额外读取第一次的 checks，逐项比较，证明结果可复现。 *)
 
 $scriptDir = If[$InputFileName === "", Directory[], DirectoryName[ExpandFileName[$InputFileName]]];
-Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}]];
+Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}], CharacterEncoding -> "UTF-8"];
 
 args = msArgs[];
 If[Length[args] < 3, msFail["INVALID_TASK", "usage: VerifyResults.wls <task.json> <code.wl> <result.json> [previous.json]"]];
@@ -76,7 +76,7 @@ msReproduced[a_, b_, kind_, absTol_, relTol_] := Which[
 
 Block[{$MessageList = {}},
   loadValue = Quiet[Check[
-    TimeConstrained[Get[codePath], 600, $Aborted],
+    TimeConstrained[Get[codePath, CharacterEncoding -> "UTF-8"], 600, $Aborted],
     $Failed
   ]];
   loadOk = loadValue =!= $Failed && loadValue =!= $Aborted;

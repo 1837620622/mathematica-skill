@@ -6,7 +6,7 @@
      reopen   — 只打开并读取结构，证明交付的 .nb 能被前端打开 *)
 
 $scriptDir = If[$InputFileName === "", Directory[], DirectoryName[ExpandFileName[$InputFileName]]];
-Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}]];
+Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}], CharacterEncoding -> "UTF-8"];
 
 args = msArgs[];
 If[Length[args] < 3, msFail["INVALID_TASK", "usage: EvaluateNotebook.wls <notebook.nb> <result.json> <evaluate|rerun|reopen> [maxSeconds]"]];

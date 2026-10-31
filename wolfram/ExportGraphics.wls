@@ -3,7 +3,7 @@
    PNG 由 Rasterize/Export 原生生成；Python 只负责检查文件，不重绘。 *)
 
 $scriptDir = If[$InputFileName === "", Directory[], DirectoryName[ExpandFileName[$InputFileName]]];
-Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}]];
+Get[FileNameJoin[{$scriptDir, "MathematicaSkill.wl"}], CharacterEncoding -> "UTF-8"];
 
 args = msArgs[];
 If[Length[args] < 4, msFail["INVALID_TASK", "usage: ExportGraphics.wls <task.json> <code.wl> <outDir> <result.json>"]];
@@ -44,7 +44,7 @@ fitImage[img_Image, width_Integer, height_Integer] := Module[
     {{Floor[padX/2], Ceiling[padX/2]}, {Floor[padY/2], Ceiling[padY/2]}}, White], $Failed]]
 ];
 
-load = Quiet[Check[Get[codePath], $Failed]];
+load = Quiet[Check[Get[codePath, CharacterEncoding -> "UTF-8"], $Failed]];
 If[load === $Failed, msFail["EVALUATION_FAILED", "loading computation code failed"]];
 
 artifacts = {};
