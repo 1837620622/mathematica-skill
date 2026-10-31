@@ -20,6 +20,7 @@ from .jsonio import file_record, write_json
 from .models import TaskDocument
 from .notebook import build_code_script, build_notebook
 from .paths import default_work_root, ensure_dir, slugify
+from .policy import scan_policy
 from .reporting import write_reports
 from .validation import (
     ValidationReport,
@@ -33,15 +34,6 @@ from .wlsyntax import check_syntax
 STAGES = ("intake", "inspect", "plan", "lint", "preflight", "native_build",
           "native_evaluate", "export", "close", "reopen", "rerun", "compare",
           "review", "deliver")
-
-POLICY_PATTERNS: dict[str, str] = {
-    "process execution": r"\bRun(?:Process)?\s*\[",
-    "remote retrieval": r"\b(?:URLDownload|URLSubmit|URLExecute|URLFetch|URLRead|URLSave)\s*\[",
-    "external file read": r'\b(?:Get|Import|ReadList|FilePrint|OpenRead)\s*\[\s*"(?:/|~|[A-Za-z]:[\\/]|\\\\)',
-    "shell escape": r"\b(?:SystemOpen|StartProcess|CreateProcess)\s*\[",
-    "dynamic code loading":
-        r"\b(?:LibraryLoad|LoadModule|Compile\s*\[[^,]+,\s*[^,]+,\s*CompilationTarget\s*->\s*\"C\")",
-}
 
 
 def _now() -> str:
@@ -122,9 +114,7 @@ def _code_units(document: TaskDocument) -> list[tuple[str, str]]:
 def _policy_findings(document: TaskDocument, *, allow_external: bool) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     for unit_id, code in _code_units(document):
-        for label, pattern in POLICY_PATTERNS.items():
-            for match in re.finditer(pattern, code):
-                findings.append({"task": unit_id, "kind": label, "match": match.group(0)[:120]})
+        findings.extend(scan_policy(code, unit_id))
     if not allow_external:
         for source in document.sources:
             if source.startswith(("http://", "https://", "ftp://")):
