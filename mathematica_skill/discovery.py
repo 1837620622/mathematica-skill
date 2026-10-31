@@ -52,17 +52,31 @@ _VERSION_SEGMENT = re.compile(r"(?<!\d)(\d{1,2})\.(\d{1,2})(?!\d)")
 
 
 def _version_key(path: Path) -> tuple[int, ...]:
-    """只取路径里形如 14.0 / 13.3 的版本段，取最新。
+    """版本排序键：优先 .app bundle 的 Info.plist，其次路径里的 14.0 / 13.3。
 
     不能把路径里所有数字都算进来：Windows 的 Program Files (x86) 里那个 86
-    会被误当成版本号，结果反而选中旧版。
-    会把 (x86) 的 86 当成版本号，反而选中旧版。
+    会被误当成版本号，反而选中旧版。
+    macOS 上 `Mathematica 14.1.app` 版本在路径里、`Wolfram Engine.app` 不在，
+    所以必须读 bundle 元数据，否则引擎版本永远排最后。
     """
+    if platform.system() == "Darwin" and ".app" in str(path):
+        version = bundle_info(path).get("version") or (0, 0)
+        if version != (0, 0):
+            return tuple(version)
     matches = _VERSION_SEGMENT.findall(str(path))
     if not matches:
         return (0, 0)
     major, minor = matches[-1]
     return (int(major), int(minor))
+
+
+def _sort_key(path: Path) -> tuple[int, int, int]:
+    """版本优先；同版本时带前端的 Mathematica.app 优先于 Wolfram Engine。"""
+    version = _version_key(path)
+    has_frontend = 1
+    if platform.system() == "Darwin" and ".app" in str(path):
+        has_frontend = 1 if bundle_info(path).get("has_frontend") else 0
+    return (version[0], version[1], has_frontend)
 
 
 def wolframscript_config_paths() -> list[Path]:
@@ -101,18 +115,131 @@ def kernel_from_config() -> Path | None:
     return None
 
 
+def macos_search_paths(etc: Path | None = None, home: Path | None = None) -> list[str]:
+    """macOS 上 GUI 应用拿到的 PATH 只有 /usr/bin:/bin:/usr/sbin:/sbin。
+
+    官方 wolframscript 安装器把链接放在 /usr/local/bin，而 /etc/paths 与
+    /etc/paths.d/* 才是系统声明的可执行目录；从 Finder 启动的宿主（包括各种
+    Agent 客户端）不会执行 path_helper，所以这里手动补一份。
+    """
+    root = etc or Path("/etc")
+    directories: list[str] = []
+
+    def _add(value: str) -> None:
+        value = value.strip()
+        if value and value not in directories:
+            directories.append(value)
+
+    paths_file = root / "paths"
+    if paths_file.is_file():
+        try:
+            for line in paths_file.read_text(encoding="utf-8", errors="replace").splitlines():
+                _add(line)
+        except OSError:
+            pass
+    paths_dir = root / "paths.d"
+    if paths_dir.is_dir():
+        try:
+            for entry in sorted(paths_dir.iterdir()):
+                if not entry.is_file():
+                    continue
+                try:
+                    _add(entry.read_text(encoding="utf-8", errors="replace"))
+                except OSError:
+                    continue
+        except OSError:
+            pass
+    if home is not None:
+        _add(str(home / ".local" / "bin"))
+    return directories
+
+
+def augmented_env() -> dict[str, str]:
+    """给子进程用的环境：在 macOS 上补上系统路径声明里的目录。"""
+    env = os.environ.copy()
+    if platform.system() != "Darwin":
+        return env
+    extras = [path for path in macos_search_paths(home=Path.home()) if Path(path).is_dir()]
+    if not extras:
+        return env
+    current = env.get("PATH", "")
+    parts = current.split(os.pathsep) if current else []
+    for item in reversed(extras):
+        if item not in parts:
+            parts.insert(0, item)
+    env["PATH"] = os.pathsep.join(parts)
+    return env
+
+
+def _which(name: str) -> str | None:
+    found = shutil.which(name)
+    if found:
+        return found
+    if platform.system() != "Darwin":
+        return None
+    for directory in macos_search_paths(home=Path.home()):
+        candidate = Path(directory) / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
+def app_bundle(path: Path | str) -> Path | None:
+    """从 .app 内任意路径回推 bundle 根目录。"""
+    target = Path(path)
+    for parent in [target, *target.parents]:
+        if parent.suffix == ".app":
+            return parent
+    return None
+
+
+def bundle_info(path: Path | str) -> dict[str, Any]:
+    """读 .app 的 Info.plist：版本号，以及它是否带 Notebook 前端。
+
+    Mathematica.app 有前端；Wolfram Engine.app 只有内核。
+    版本号取自 CFBundleShortVersionString（14.1.0 → (14, 1)）。
+    """
+    bundle = app_bundle(path)
+    info: dict[str, Any] = {"bundle": str(bundle) if bundle else "",
+                            "version": (0, 0), "has_frontend": None, "product": ""}
+    if bundle is None:
+        return info
+    name = bundle.stem
+    info["product"] = name
+    info["has_frontend"] = "mathematica" in name.lower()
+    plist = bundle / "Contents" / "Info.plist"
+    if not plist.is_file():
+        return info
+    try:
+        import plistlib
+
+        with plist.open("rb") as handle:
+            data = plistlib.load(handle)
+    except (OSError, ValueError, plistlib.InvalidFileException):
+        return info
+    if not isinstance(data, dict):
+        return info
+    raw = str(data.get("CFBundleShortVersionString") or data.get("CFBundleVersion") or "")
+    match = _VERSION_SEGMENT.search(raw)
+    if match:
+        info["version"] = (int(match.group(1)), int(match.group(2)))
+    return info
+
+
 def _candidate_kernels() -> list[Path]:
     home = Path.home()
     system = platform.system()
     candidates: list[Path] = []
     if system == "Darwin":
+        # 官方安装器：/Applications/Mathematica.app、/Applications/Wolfram Engine.app
+        # 也见过带版本号的 /Applications/Mathematica 14.1.app、用户级 ~/Applications。
         for base in (Path("/Applications"), home / "Applications"):
-            candidates.append(base / "Mathematica.app/Contents/MacOS/WolframKernel")
-            candidates.append(base / "Wolfram Engine.app/Contents/MacOS/WolframKernel")
-            candidates.append(base / "WolframEngine.app/Contents/MacOS/WolframKernel")
-        candidates += sorted(Path("/Applications").glob("Mathematica*.app/Contents/MacOS/WolframKernel"))
-        candidates += sorted(Path("/Applications").glob("Wolfram*Engine*.app/Contents/MacOS/WolframKernel"))
-        candidates += sorted((home / "Applications").glob("Mathematica*.app/Contents/MacOS/WolframKernel"))
+            for name in ("Mathematica.app", "Wolfram Engine.app", "WolframEngine.app",
+                         "Wolfram.app"):
+                candidates.append(base / name / "Contents/MacOS/WolframKernel")
+        for pattern in ("Mathematica*.app", "Wolfram*Engine*.app", "Wolfram*.app"):
+            candidates += sorted(Path("/Applications").glob(f"{pattern}/Contents/MacOS/WolframKernel"))
+            candidates += sorted((home / "Applications").glob(f"{pattern}/Contents/MacOS/WolframKernel"))
         candidates += [Path("/opt/homebrew/bin/WolframKernel"), Path("/usr/local/bin/WolframKernel")]
     elif system == "Windows":
         roots = [Path(os.environ.get("ProgramFiles", r"C:\Program Files")),
@@ -156,7 +283,7 @@ def find_kernel() -> Path | None:
     if configured is not None:
         return configured
     matches = [path for path in _candidate_kernels() if path.is_file()]
-    matches.sort(key=_version_key, reverse=True)
+    matches.sort(key=_sort_key, reverse=True)
     return matches[0] if matches else None
 
 
@@ -203,13 +330,13 @@ def find_wolframscript() -> Path | None:
         value = os.environ.get(variable)
         if value and Path(value).expanduser().is_file():
             return Path(value).expanduser()
-    found = shutil.which("wolframscript")
+    found = _which("wolframscript")
     if found:
         return Path(found)
     matches = [path for path in _candidate_scripts() if path.is_file()]
     if not matches:
         return None
-    matches.sort(key=_version_key, reverse=True)
+    matches.sort(key=_sort_key, reverse=True)
     return matches[0]
 
 
@@ -318,7 +445,10 @@ class EngineReport:
     license_expiration: str = ""
     engine_usable: bool = False
     frontend_available: bool = False
+    frontend_capable: bool | None = None
     frontend_detail: str = "not probed"
+    product: str = ""
+    arch_match: bool | None = None
     agenttools_version: str = ""
     agenttools_paths: list[str] = field(default_factory=list)
     mode: str = "none"
@@ -342,7 +472,10 @@ class EngineReport:
             "license_expiration": self.license_expiration,
             "engine_usable": self.engine_usable,
             "frontend_available": self.frontend_available,
+            "frontend_capable": self.frontend_capable,
             "frontend_detail": self.frontend_detail,
+            "product": self.product,
+            "arch_match": self.arch_match,
             "agenttools_version": self.agenttools_version,
             "agenttools_paths": self.agenttools_paths,
             "mode": self.mode,
@@ -386,19 +519,61 @@ def detect(*, deep_frontend: bool = False, timeout: float = 25.0) -> EngineRepor
         return report
     report.mode = "wolframscript" if wolframscript else "kernel"
     report.agenttools_version, report.agenttools_paths = find_agenttools()
+
+    if platform.system() == "Darwin" and kernel is not None:
+        info = bundle_info(kernel)
+        report.product = str(info.get("product", ""))
+        report.frontend_capable = info.get("has_frontend")
+        if report.frontend_capable is False:
+            report.warnings.append(
+                "This installation is Wolfram Engine, which ships no notebook front end; "
+                "本机只能算 .wl 与出图，无法验证 .nb。"
+            )
+        kernel_arch = str(payload.get("processor", ""))
+        host_arch = platform.machine().lower()
+        if kernel_arch and host_arch:
+            kernel_arm = "arm" in kernel_arch.lower() or "apple" in kernel_arch.lower()
+            host_arm = host_arch in {"arm64", "aarch64"}
+            report.arch_match = kernel_arm == host_arm
+            if not report.arch_match:
+                report.warnings.append(
+                    f"Kernel architecture ({kernel_arch}) differs from the host ({platform.machine()}); "
+                    "Rosetta or emulation may slow every run down."
+                )
     if not wolframscript:
         report.warnings.append("wolframscript was not found; notebook building uses the kernel fallback.")
     if deep_frontend:
-        available, detail = _probe_frontend(wolframscript, kernel, max(10.0, min(timeout, 30.0)))
-        report.frontend_available = available
-        report.frontend_detail = detail
-        if not available:
+        if report.frontend_capable is False:
+            # Wolfram Engine：没有前端，探活只会白等一分钟。
+            report.frontend_available = False
+            report.frontend_detail = "this installation has no notebook front end (Wolfram Engine)"
+        else:
+            # macOS 上 Mathematica 冷启动（含许可证校验）可能要 30-60 秒，
+            # 探活超时太短会误判"没有前端"，进而错误地阻止交付。
+            probe_timeout = max(60.0, min(timeout, 180.0))
+            available, detail = _probe_frontend(wolframscript, kernel, probe_timeout)
+            report.frontend_available = available
+            report.frontend_detail = detail
+        if not report.frontend_available:
             report.warnings.append(
                 "Notebook frontend is unavailable; verified notebook delivery is not possible on this machine."
+                + _frontend_hint(platform.system())
             )
     else:
         report.frontend_detail = "not probed; run doctor --frontend"
     return report
+
+
+def _frontend_hint(system: str) -> str:
+    if system == "Darwin":
+        return (" On macOS the front end needs a logged-in desktop session: launch Mathematica once from "
+                "Finder, then run `mathematica-skill doctor --frontend` again from that same user session. "
+                "SSH sessions and launchd agents usually cannot start it.")
+    if system == "Windows":
+        return (" On Windows the front end needs an interactive desktop session; a service or scheduled "
+                "task running as SYSTEM cannot open a notebook window.")
+    return (" On Linux, Wolfram Engine has no notebook front end; only .wl computation and PNG export "
+            "are possible there.")
 
 
 def summarize(report: EngineReport) -> str:
@@ -410,6 +585,7 @@ def summarize(report: EngineReport) -> str:
         f"version  : {report.kernel_version or 'unknown'}",
         f"licence  : {report.license_type or 'unknown'} {report.license_expiration}".rstrip(),
         f"engine   : {'usable' if report.engine_usable else 'unavailable'}",
+        f"product  : {report.product or 'unknown'}",
         f"frontend : {'available' if report.frontend_available else 'unavailable'} ({report.frontend_detail})",
         f"AgentTools: {report.agenttools_version or 'not detected'}",
     ]

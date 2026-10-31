@@ -60,7 +60,11 @@ def run_process(
     env: dict[str, str] | None = None,
 ) -> NativeRun:
     started = time.monotonic()
-    merged_env = os.environ.copy()
+    # macOS 上从 Finder / GUI 宿主启动时 PATH 很短，wolframscript 常常找不到；
+    # augmented_env 会补上 /etc/paths.d 里声明的目录（Linux/Windows 原样返回）。
+    from .discovery import augmented_env
+
+    merged_env = augmented_env()
     if env:
         merged_env.update(env)
     creationflags = 0

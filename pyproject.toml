@@ -26,6 +26,17 @@ classifiers = [
 [project.scripts]
 mathematica-skill = "mathematica_skill.cli:main"
 
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[tool.setuptools.data-files]
+"share/mathematica-skill/wolfram" = ["wolfram/*.wl", "wolfram/*.wls"]
+"share/mathematica-skill/skills/mathematica-native" = ["skills/mathematica-native/SKILL.md"]
+"share/mathematica-skill/skills/mathematica-native/references" = [
+  "skills/mathematica-native/references/*.md",
+]
+"share/mathematica-skill/assets" = ["assets/icon.png", "assets/icon.svg"]
+
 [project.urls]
 Homepage = "https://github.com/1837620622/mathematica-skill"
 Issues = "https://github.com/1837620622/mathematica-skill/issues"

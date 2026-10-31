@@ -96,14 +96,18 @@ are adapted, but a platform only counts as verified when a real run has happened
 | MCP | Nine `mathematica_*` tools over stdio, newline-delimited JSON |
 | Skill | Agent Skills frontmatter; installs into Claude, Codex, Cursor, OpenCode, … |
 
-## 4. Quick start
+## 4. Install (three channels, usable immediately)
 
 ```bash
-git clone https://github.com/1837620622/mathematica-skill.git
-cd mathematica-skill
-python3 -m pip install -e .
-mathematica-skill doctor --frontend
+npx mathematica-skill doctor --frontend     # no install
+npm i -g mathematica-skill                  # global install
+pip install mathematica-skill               # Python install
 ```
+
+All three run the same orchestration layer, the same Wolfram scripts and the same skill.
+The npm tarball already ships the Python source and `wolfram/`, so no second `pip install` is needed.
+See [docs/INSTALL.md](docs/INSTALL.md).
+
 
 `doctor` answers three questions: is there a kernel, is the licence usable, is there a notebook front end.
 

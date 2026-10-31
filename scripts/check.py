@@ -127,6 +127,61 @@ def check_examples(failures: list[str]) -> None:
             failures.append(f"{path.relative_to(ROOT)}: {exc}")
 
 
+def check_versions(failures: list[str]) -> None:
+    """pyproject / package.json / __init__.py 的版本号必须一致。"""
+    import json
+    import re
+
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(r'^version = "([^"]+)"', pyproject, re.M)
+    python_version = match.group(1) if match else ""
+
+    package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    npm_version = package.get("version", "")
+
+    init_text = (ROOT / "mathematica_skill" / "__init__.py").read_text(encoding="utf-8")
+    init_match = re.search(r'__version__ = "([^"]+)"', init_text)
+    init_version = init_match.group(1) if init_match else ""
+
+    versions = {"pyproject.toml": python_version, "package.json": npm_version,
+                "__init__.py": init_version}
+    if len(set(versions.values())) != 1 or not python_version:
+        failures.append(f"版本号不一致：{versions}")
+
+
+def check_npm_layout(failures: list[str]) -> None:
+    """npm 包必须包含运行期需要的全部目录，bin 必须指向真实文件。"""
+    import json
+
+    package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    bins = package.get("bin") or {}
+    if "mathematica-skill" not in bins:
+        failures.append("package.json 缺少 bin.mathematica-skill")
+    for name, relative in bins.items():
+        target = ROOT / relative
+        if not target.is_file():
+            failures.append(f"package.json bin.{name} 指向不存在的文件：{relative}")
+        elif not target.read_text(encoding="utf-8").startswith("#!/usr/bin/env node"):
+            failures.append(f"bin/{relative} 缺少 node shebang")
+
+    listed = package.get("files") or []
+    for required in ("bin/", "mathematica_skill/", "wolfram/", "skills/", "README.md", "LICENSE"):
+        if not any(item == required or item.rstrip("/") == required.rstrip("/") for item in listed):
+            failures.append(f"package.json files 未包含 {required}（npm 安装后无法运行）")
+
+
+def check_skill_install_targets(failures: list[str]) -> None:
+    """Skill 必须能被安装器找到并包含 frontmatter。"""
+    from mathematica_skill.paths import skill_dir
+
+    source = skill_dir()
+    if not (source / "SKILL.md").is_file():
+        failures.append(f"skill_dir() 找不到 SKILL.md: {source}")
+        return
+    if not (source / "references").is_dir():
+        failures.append("Skill 缺少 references/ 目录")
+
+
 def run_tests(failures: list[str]) -> None:
     result = subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=ROOT, capture_output=True, text=True)
     tail = (result.stdout or "").strip().splitlines()[-3:]
@@ -144,6 +199,9 @@ def main() -> int:
     check_wolfram(failures)
     check_skill_frontmatter(failures)
     check_examples(failures)
+    check_versions(failures)
+    check_npm_layout(failures)
+    check_skill_install_targets(failures)
     run_tests(failures)
     if failures:
         print("\n发现 %d 个问题：" % len(failures))

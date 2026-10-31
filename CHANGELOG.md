@@ -47,6 +47,19 @@
   任一不满足即 `ENCODING_MISMATCH`，不产出乱码文件。默认另存新文件，`--in-place` 先备份。
 - 新增 `examples/06-edit-notebook.json`。
 
+### 0.1.0 安装与 macOS
+
+- 新增 npm 包与 `bin/mathematica-skill.js`：`npx mathematica-skill ...`、`npm i -g mathematica-skill`
+  装完即用。包装脚本自动寻找 Python 3.10+（含 macOS GUI 环境里的
+  `/opt/homebrew/bin`、`/Library/Frameworks/Python.framework/...`），并设置 `PYTHONPATH`
+  指向包内源码，不需要二次 `pip install`。
+- `pip install` 现在会把 `wolfram/`、`skills/`、`assets/` 装到 `<prefix>/share/mathematica-skill/`；
+  `wolfram_dir()` / `skill_dir()` 覆盖源码树、npm 包、venv、`--user`、`--target` 五种布局。
+- macOS：补全 `/etc/paths` 与 `/etc/paths.d/*` 到子进程 `PATH`（Finder 启动的进程 PATH 很短）；
+  版本排序改读 `.app` 的 `Info.plist`；同版本优先带前端的 `Mathematica.app`；
+  `doctor` 新增 `product`、`frontend_capable`、`arch_match`，Wolfram Engine 直接标记无前端，
+  前端探活超时抬到 60-180 秒；`scripts/check.py` 增加版本一致性与 npm 布局检查。
+
 ### 验证范围
 
 - 已用真实执行验证：词法检查、schema 校验、PNG 解析、安装器、MCP 协议、无内核/无前端时的失败路径。

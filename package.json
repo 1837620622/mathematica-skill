@@ -1,0 +1,60 @@
+{
+  "name": "mathematica-skill",
+  "version": "0.1.0",
+  "description": "Native, verifiable Mathematica automation for AI agents: one skill, CLI + MCP. Real Wolfram computation, real .nb notebooks, native 4K figures, independent re-computation gates.",
+  "keywords": [
+    "mathematica",
+    "wolfram",
+    "wolfram-language",
+    "agent-skills",
+    "mcp",
+    "model-context-protocol",
+    "cli",
+    "automation",
+    "notebook",
+    "scientific-computing"
+  ],
+  "license": "MIT",
+  "author": "1837620622",
+  "homepage": "https://github.com/1837620622/mathematica-skill",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1837620622/mathematica-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/1837620622/mathematica-skill/issues"
+  },
+  "bin": {
+    "mathematica-skill": "bin/mathematica-skill.js"
+  },
+  "files": [
+    "bin/",
+    "mathematica_skill/",
+    "wolfram/",
+    "skills/",
+    "assets/icon.png",
+    "assets/icon.svg",
+    "examples/",
+    "docs/CLI.md",
+    "docs/SECURITY.md",
+    "README.md",
+    "README.en.md",
+    "LICENSE",
+    "pyproject.toml"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "os": [
+    "darwin",
+    "win32",
+    "linux"
+  ],
+  "scripts": {
+    "test": "node bin/mathematica-skill.js --version",
+    "doctor": "node bin/mathematica-skill.js doctor"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

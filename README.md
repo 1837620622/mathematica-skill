@@ -91,16 +91,23 @@ macOS Apple Silicon 是主要验收平台；Windows / Linux 的路径、进程�
 | 图面检查 | 尺寸、空白、单色、文件完整性（只读，不重绘） |
 | 报告 | `validation.json` + `VALIDATION.md`，含「验证边界」声明 |
 | 交付 | 白名单目录 + SHA-256 manifest，可核对 |
-| 安装 | `install / update / rollback / uninstall`，只删自己创建的文件 |
+| 安装 | npx / npm / pip 三种入口，装完即用；`install / update / rollback / uninstall` 只动自己创建的文件 |
 | MCP | 9 个 `mathematica_*` 工具，stdio 传输，单行 JSON 帧 |
 | Skill | 符合 Agent Skills frontmatter，可装到 Claude / Codex / Cursor / OpenCode 等 |
 
-## 4. 快速开始
+## 4. 安装（三种入口，装完即用）
 
 ```bash
-git clone https://github.com/1837620622/mathematica-skill.git
-cd mathematica-skill
-python3 -m pip install -e .
+npx mathematica-skill doctor --frontend     # 不安装，直接用
+npm i -g mathematica-skill                  # 全局安装
+pip install mathematica-skill               # Python 方式
+```
+
+三条命令行为完全一致：同一套调度层、同一批 Wolfram 脚本、同一个 Skill。
+npm 包里已经带上 Python 源码与 `wolfram/`，不需要再 `pip install` 一次。
+详见 [docs/INSTALL.md](docs/INSTALL.md)。
+
+```bash
 mathematica-skill doctor --frontend
 ```
 
@@ -220,7 +227,8 @@ mathematica-skill/
 ├── skills/mathematica-native # Agent Skill：SKILL.md + references
 ├── examples/                 # 可运行任务示例（含故意失败的样本）
 ├── tests/                    # 单元 / 集成 / 回归
-├── docs/                     # 架构、CLI、验证、安全、macOS
+├── bin/                      # npx / npm 入口（薄包装，调用同一套 Python）
+├── docs/                     # 安装、架构、CLI、验证、安全、macOS
 └── .github/workflows/        # 静态检查与测试
 ```
 
