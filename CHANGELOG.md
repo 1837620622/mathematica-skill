@@ -1,5 +1,35 @@
 # Changelog
 
+## 未发布
+
+### 修复
+- **Claude 桌面版 MCP 配置**：`install --mcp-client claude-desktop` 写入的 `env` 现在包含 `PYTHONUTF8`，
+  源码或 npm 安装时还包含 `PYTHONPATH`。此前 npx 安装后 GUI 宿主启动 MCP 会 `ModuleNotFoundError`。
+  OpenCode 使用 `environment` 键，Codex TOML 同步写入。
+- **Codex TOML 强制重装**：替换段时改用函数替换，Windows 路径里的反斜杠不再被正则吃掉。
+- **没有 checks 不能 verified**：`run` 在进入内核之前以 `CHECKS_EMPTY` 拦下；`validate_checks` 对
+  「没有检查记录」和「检查数为 0」都改为 error（此前只是 warning，零检查任务可以走到 verified）。
+- **被门禁拦下的运行也写验收报告**：preflight 阶段拦下时同样写出 `_validation/validation.json` 与 `VALIDATION.md`。
+- **MCP 工具名断言**：`tests/unit/test_mcp_server.py` 改为精确集合比较；README 里的工具数量从错误的 9 改为实际的 11（改动前代码里是 10 个）。
+
+### 新增
+- `compute` 子命令与 `mathematica_compute` MCP 工具：在真实内核里执行一段代码，返回最后一个表达式的值、
+  消息和可选 PNG。结果永远 `verified=false`，不进入 checks、Notebook 与复算流程。
+- `wolfram/ComputeCode.wls`：快速计算的 WL 侧，结果走 `result.json`，图形只导出到内部目录。
+- `mathematica_skill/policy.py`：危险调用扫描从 `workflow.py` 移出，`run` 与 `compute` 共用。
+- `mathematica_skill/paths.py::unique_path`：目标已存在时加 `-2`，不静默覆盖。
+- `tests/native/`：真实内核验收，没有许可证时明确 `skipped: no Wolfram engine`。
+- `tests/integration/test_mcp_launch.py`：用配置里的 command/env 在干净环境启动 MCP。
+
+### 删除
+- `WolframscriptAdapter.evaluate_code`：没有调用方、没有测试，由 `compute_code` 替代。
+
+### 验证范围
+- **已验证**（本环境，无 Mathematica）：静态检查、Python 单元与集成测试（239 通过，3 个 native 测试 skip）、
+  干净环境下按配置启动 MCP 并列出 11 个工具、零检查门禁在无内核时的拦截、安装器配置合并与 TOML 替换。
+- **未验证**：所有真内核与前端路径，包括 `compute`、`run`、`tests/native` 和 `ComputeCode.wls` 本身；
+  macOS 与 Windows 实机均未运行。
+
 ## 0.1.0 — 首个可用版本
 
 ### 新增
