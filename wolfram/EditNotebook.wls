@@ -141,9 +141,9 @@ setTitle[nb_, text_String] := Module[{positions, n},
 ];
 
 (* 只翻我们自己的固定标题，不擅自改用户正文。 *)
-headingPairs = {<|"en" -> "Problem", "zh" -> "题目"|>,
-                <|"en" -> "Assumptions", "zh" -> "假设"|>};
-outputPrefixes = <|"en" -> "Output: ", "zh" -> "输出："|>;
+headingPairs = {<|"en" -> "Problem", "zh" -> "\:9898\:76ee"|>,
+                <|"en" -> "Assumptions", "zh" -> "\:5047\:8bbe"|>};
+outputPrefixes = <|"en" -> "Output: ", "zh" -> "\:8f93\:51fa\:ff1a"|>;
 
 (* 前端保存的 Text 单元是 Cell[TextData[{"..."}], "Text"]，不能只看 cell[[1]] 是字符串。 *)
 cellText[cell_] := Which[
