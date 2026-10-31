@@ -306,6 +306,7 @@ Python 再校验 UTF-8 与 U+FFFD。任何字符丢失都判失败，不会交�
 python3 -m pip install -e .
 python3 -m pytest -q                     # 单元测试（不需要 Mathematica）
 python3 scripts/check.py                 # 词法检查 + WL 括号平衡 + 测试
+python3 -m pytest tests/native -m native -ra   # 装有 Mathematica 的机器上跑真实验收（无许可证会 skip）
 ```
 
 需要真实内核的测试标记为 `@pytest.mark.native`，在普通 CI 上跳过，**不会**假装通过。

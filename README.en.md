@@ -267,9 +267,10 @@ Details: `skills/mathematica-native/references/security.md`.
 python3 -m pip install -e .
 python3 -m pytest -q          # unit tests, no Mathematica required
 python3 scripts/check.py      # lexical checks + WL bracket balance + tests
+python3 -m pytest tests/native -m native -ra   # real acceptance on a machine with Mathematica (skips without a licence)
 ```
 
-Tests that need a real kernel are marked `@pytest.mark.native`; public CI skips them and never fakes a pass.
+Tests that need a real kernel are marked `@pytest.mark.native`; public CI skips them and never fakes a pass. On a machine with a licence, a plain `pytest` runs them too.
 
 ## 12. Licence
 
